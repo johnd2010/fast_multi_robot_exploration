@@ -78,6 +78,7 @@ void PerceptionUtils::getFOV(vector<Vector3d>& list1, vector<Vector3d>& list2) {
     list1.push_back(p1);
     list2.push_back(p2);
   }
+
 }
 
 bool PerceptionUtils::insideFOV(const Vector3d& point) {

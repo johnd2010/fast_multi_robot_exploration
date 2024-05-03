@@ -57,8 +57,8 @@ public:
       const vector<int>& first, const vector<vector<int>>& firsts,
       const vector<vector<int>>& seconds, const double& w_f);
 
-  shared_ptr<ExplorationData> ed_;
-  shared_ptr<ExplorationParam> ep_;
+  shared_ptr<ExplorationData> exploration_data_;
+  shared_ptr<ExplorationParam> exploration_param_;
   shared_ptr<FastPlannerManager> planner_manager_;
   shared_ptr<FrontierFinder> frontier_finder_;
   shared_ptr<HGrid> hgrid_;

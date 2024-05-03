@@ -299,7 +299,7 @@ void MultiMapManager::sendChunks(
 
 void MultiMapManager::getOccOfChunk(const vector<uint32_t>& adrs, vector<uint8_t>& occs) {
   for (auto adr : adrs) {
-    uint8_t occ = map_->md_->occupancy_buffer_[adr] > map_->mp_->min_occupancy_log_ ? 1 : 0;
+    uint8_t occ = map_->map_data_->occupancy_buffer_[adr] > map_->map_param_->min_occupancy_log_ ? 1 : 0;
     occs.push_back(occ);
   }
 }
@@ -411,11 +411,11 @@ void MultiMapManager::loggingTimerCallback(const ros::TimerEvent& e) {
   // Calculate explored space
   double total_occupied_volume = 0.0;
 
-  for (uint x = 0; x < map_->mp_->map_voxel_num_[0]; ++x) {
-    for (uint y = 0; y < map_->mp_->map_voxel_num_[1]; ++y) {
-      for (uint z = 0; z < map_->mp_->map_voxel_num_[2]; ++z) {
+  for (uint x = 0; x < map_->map_param_->map_voxel_num_[0]; ++x) {
+    for (uint y = 0; y < map_->map_param_->map_voxel_num_[1]; ++y) {
+      for (uint z = 0; z < map_->map_param_->map_voxel_num_[2]; ++z) {
         if (map_->getOccupancy(Eigen::Vector3i(x, y, z)) != SDFMap::OCCUPANCY::UNKNOWN) {
-          total_occupied_volume += std::pow(map_->mp_->resolution_, 3.);
+          total_occupied_volume += std::pow(map_->map_param_->resolution_, 3.);
         }
       }
     }
@@ -484,10 +484,10 @@ void MultiMapManager::mergeChunkIds(
 }
 
 void MultiMapManager::adrToIndex(const uint32_t& adr, Eigen::Vector3i& idx) {
-  // x * mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2) + y * mp_->map_voxel_num_(2) + z
+  // x * map_param_->map_voxel_num_(1) * map_param_->map_voxel_num_(2) + y * map_param_->map_voxel_num_(2) + z
   uint32_t tmp_adr = adr;
-  const int a = map_->mp_->map_voxel_num_[1] * map_->mp_->map_voxel_num_[2];
-  const int b = map_->mp_->map_voxel_num_[2];
+  const int a = map_->map_param_->map_voxel_num_[1] * map_->map_param_->map_voxel_num_[2];
+  const int b = map_->map_param_->map_voxel_num_[2];
 
   idx[0] = tmp_adr / a;
   tmp_adr = tmp_adr % a;
@@ -523,10 +523,10 @@ void MultiMapManager::insertChunkToMap(const MapChunk& chunk, const int& drone_i
     map_->posToIndex(pos, idx);
     auto adr_tf = map_->toAddress(idx);
 
-    // map_->md_->occupancy_buffer_[adr] =
-    //     chunk.voxel_occ_[i] == 1 ? map_->mp_->clamp_max_log_ : map_->mp_->clamp_min_log_;
-    map_->md_->occupancy_buffer_[adr_tf] =
-        chunk.voxel_occ_[i] == 1 ? map_->mp_->clamp_max_log_ : map_->mp_->clamp_min_log_;
+    // map_->map_data_->occupancy_buffer_[adr] =
+    //     chunk.voxel_occ_[i] == 1 ? map_->map_param_->clamp_max_log_ : map_->map_param_->clamp_min_log_;
+    map_->map_data_->occupancy_buffer_[adr_tf] =
+        chunk.voxel_occ_[i] == 1 ? map_->map_param_->clamp_max_log_ : map_->map_param_->clamp_min_log_;
 
     // Update the chunk box
 
@@ -542,19 +542,19 @@ void MultiMapManager::insertChunkToMap(const MapChunk& chunk, const int& drone_i
 
     // Update the all box
     for (int k = 0; k < 3; ++k) {
-      map_->md_->all_min_[k] = min(map_->md_->all_min_[k], pos[k]);
-      map_->md_->all_max_[k] = max(map_->md_->all_max_[k], pos[k]);
+      map_->map_data_->all_min_[k] = min(map_->map_data_->all_min_[k], pos[k]);
+      map_->map_data_->all_max_[k] = max(map_->map_data_->all_max_[k], pos[k]);
     }
     // Inflate for the occupied
     if (chunk.voxel_occ_[i] == 1) {
-      static const int inf_step = ceil(map_->mp_->obstacles_inflation_ / map_->mp_->resolution_);
+      static const int inf_step = ceil(map_->map_param_->obstacles_inflation_ / map_->map_param_->resolution_);
       for (int inf_x = -inf_step; inf_x <= inf_step; ++inf_x)
         for (int inf_y = -inf_step; inf_y <= inf_step; ++inf_y)
           for (int inf_z = -inf_step; inf_z <= inf_step; ++inf_z) {
             Eigen::Vector3i inf_pt(idx[0] + inf_x, idx[1] + inf_y, idx[2] + inf_z);
             if (!map_->isInMap(inf_pt)) continue;
             int inf_adr = map_->toAddress(inf_pt);
-            map_->md_->occupancy_buffer_inflate_[inf_adr] = 1;
+            map_->map_data_->occupancy_buffer_inflate_[inf_adr] = 1;
           }
       // vector<Eigen::Vector3i> inf_pts(pow(2 * inf_step + 1, 3));
       // map_->inflatePoint(idx, inf_step, inf_pts);
@@ -563,9 +563,9 @@ void MultiMapManager::insertChunkToMap(const MapChunk& chunk, const int& drone_i
       //   if (!map_->isInMap(inf_pt)) continue;
       //   int idx_inf = map_->toAddress(inf_pt);
       //   if (idx_inf >= 0 &&
-      //       idx_inf < map_->mp_->map_voxel_num_(0) * map_->mp_->map_voxel_num_(1) *
-      //                     map_->mp_->map_voxel_num_(2)) {
-      //     map_->md_->occupancy_buffer_inflate_[idx_inf] = 1;
+      //       idx_inf < map_->map_param_->map_voxel_num_(0) * map_->map_param_->map_voxel_num_(1) *
+      //                     map_->map_param_->map_voxel_num_(2)) {
+      //     map_->map_data_->occupancy_buffer_inflate_[idx_inf] = 1;
       //   }
       // }
     }

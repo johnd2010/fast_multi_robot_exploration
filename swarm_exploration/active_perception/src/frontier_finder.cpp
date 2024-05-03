@@ -62,7 +62,7 @@ void FrontierFinder::searchFrontiers() {
 
   // Bounding box of external chunks
   vector<Eigen::Vector3d> chunk_mins, chunk_maxs;
-  edt_env_->sdf_map_->mm_->getChunkBoxes(chunk_mins, chunk_maxs, false);
+  edt_env_->sdf_map_->multi_map_->getChunkBoxes(chunk_mins, chunk_maxs, false);
 
   vector<Eigen::Vector3d> mins, maxs;
   mins.push_back(update_min);
@@ -1024,7 +1024,7 @@ bool FrontierFinder::isFrontierCovered() {
 
   // Bounding box of external chunks
   vector<Eigen::Vector3d> chunk_mins, chunk_maxs;
-  edt_env_->sdf_map_->mm_->getChunkBoxes(chunk_mins, chunk_maxs, false);
+  edt_env_->sdf_map_->multi_map_->getChunkBoxes(chunk_mins, chunk_maxs, false);
 
   vector<Eigen::Vector3d> mins, maxs;
   mins.push_back(update_min);

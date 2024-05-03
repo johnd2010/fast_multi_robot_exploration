@@ -155,7 +155,7 @@ void UniformGrid::updateGridData(const int& drone_id, vector<int>& grid_ids, vec
   edt_->sdf_map_->getUpdatedBox(update_min, update_max, reset);
 
   vector<Eigen::Vector3d> update_mins, update_maxs;
-  edt_->sdf_map_->mm_->getChunkBoxes(update_mins, update_maxs, reset);
+  edt_->sdf_map_->multi_map_->getChunkBoxes(update_mins, update_maxs, reset);
 
   // Rediscovered grid
   vector<int> rediscovered_ids;

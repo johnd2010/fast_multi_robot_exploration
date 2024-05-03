@@ -39,7 +39,6 @@ FameExplorationManager::~FameExplorationManager() {
 void FameExplorationManager::initialize(ros::NodeHandle& nh) {
   planner_manager_.reset(new FastPlannerManager);
   planner_manager_->initPlanModules(nh);
-
   edt_environment_ = planner_manager_->edt_environment_;
   sdf_map_ = edt_environment_->sdf_map_;
   frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
@@ -226,6 +225,8 @@ int FameExplorationManager::planExploreMotion(
 
   return SUCCEED;
 }
+
+
 
 bool FameExplorationManager::isPositionReachable(const Vector3d& from, const Vector3d& to) const {
   /*if (sdf_map_->getInflateOccupancy(to) != SDFMap::OCCUPANCY::FREE) {

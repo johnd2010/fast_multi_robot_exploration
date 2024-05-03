@@ -40,7 +40,7 @@ void MapROS::init() {
 
   proj_points_.resize(640 * 480 / (skip_pixel_ * skip_pixel_));
   point_cloud_.points.resize(640 * 480 / (skip_pixel_ * skip_pixel_));
-  // proj_points_.reserve(640 * 480 / map_->mp_->skip_pixel_ / map_->mp_->skip_pixel_);
+  // proj_points_.reserve(640 * 480 / map_->map_param_->skip_pixel_ / map_->map_param_->skip_pixel_);
   proj_points_cnt = 0;
 
   local_updated_ = false;
@@ -138,7 +138,7 @@ void MapROS::depthPoseCallback(
     return;
 
   // Simulate swarm communication
-  map_->mm_->drone_pos_ = camera_pos_;
+  map_->multi_map_->drone_pos_ = camera_pos_;
 
   camera_q_ = Eigen::Quaterniond(pose->pose.orientation.w, pose->pose.orientation.x,
       pose->pose.orientation.y, pose->pose.orientation.z);
@@ -195,59 +195,6 @@ void MapROS::cloudPoseCallback(
   }
 }
 
-// void MapROS::basecoorCallback(const swarm_msgs::swarm_drone_basecoorConstPtr& msg) {
-
-//   if (msg->self_id != map_->mm_->drone_id_ && msg->self_id != map_->mm_->vis_drone_id_) return;
-
-//   for (int i = 0; i < msg->ids.size(); ++i) {
-//     auto id = msg->ids[i];
-//     auto pos = msg->drone_basecoor[i];
-//     auto yaw = msg->drone_baseyaw[i];
-//     map_->md_->swarm_transform_[id] = Eigen::Vector4d(pos.x, pos.y, pos.z, yaw);
-//   }
-
-//   // Update global bounding box
-//   if (map_->md_->swarm_transform_.find(1) == map_->md_->swarm_transform_.end()) return;
-
-//   auto transform = map_->md_->swarm_transform_[1];
-//   double yaw = transform[3];
-//   map_->mp_->rot_sw_ << cos(yaw), -sin(yaw), 0, sin(yaw), cos(yaw), 0, 0, 0, 1;
-//   map_->mp_->trans_sw_ = transform.head<3>();
-
-//   // Compute vertices, box and normals of map in current drone's frame
-//   Eigen::Vector3d left_bottom, right_top, left_top, right_bottom;
-//   left_bottom = map_->mp_->box_mind_;
-//   right_top = map_->mp_->box_maxd_;
-
-//   left_top[0] = left_bottom[0];
-//   left_top[1] = right_top[1];
-//   left_top[2] = left_bottom[2];
-//   right_bottom[0] = right_top[0];
-//   right_bottom[1] = left_bottom[1];
-//   right_bottom[2] = left_bottom[2];
-//   right_top[2] = left_bottom[2];
-
-//   map_->mp_->vertices_ = { left_bottom, right_bottom, right_top, left_top };
-//   if (map_->mp_->use_swarm_tf_) {
-//     for (auto& vert : map_->mp_->vertices_) vert = map_->mp_->rot_sw_ * vert +
-//     map_->mp_->trans_sw_;
-//   }
-
-//   map_->mp_->vmin_ = map_->mp_->vmax_ = map_->mp_->vertices_[0];
-//   for (int j = 1; j < map_->mp_->vertices_.size(); ++j) {
-//     for (int k = 0; k < 2; ++k) {
-//       map_->mp_->vmin_[k] = min(map_->mp_->vmin_[k], map_->mp_->vertices_[j][k]);
-//       map_->mp_->vmax_[k] = max(map_->mp_->vmax_[k], map_->mp_->vertices_[j][k]);
-//     }
-//   }
-
-//   map_->mp_->normals_.clear();
-//   for (int j = 0; j < 4; ++j) {
-//     Eigen::Vector3d dir =
-//         (map_->mp_->vertices_[(j + 1) % 4] - map_->mp_->vertices_[j]).normalized();
-//     map_->mp_->normals_.push_back(dir);
-//   }
-// }
 
 void MapROS::processDepthImage() {
   proj_points_cnt = 0;
@@ -296,25 +243,25 @@ void MapROS::publishMapAll() {
   pcl::PointXYZ pt;
   pcl::PointCloud<pcl::PointXYZ> cloud1, cloud2;
 
-  // for (int x = map_->mp_->box_min_(0) - 20; x < map_->mp_->box_max_(0) + 20; ++x)
-  //   for (int y = map_->mp_->box_min_(1) - 20; y < map_->mp_->box_max_(1) + 20; ++y)
-  //     for (int z = map_->mp_->box_min_(2) /* + 1 */; z < map_->mp_->box_max_(2); ++z) {
+  // for (int x = map_->map_param_->box_min_(0) - 20; x < map_->map_param_->box_max_(0) + 20; ++x)
+  //   for (int y = map_->map_param_->box_min_(1) - 20; y < map_->map_param_->box_max_(1) + 20; ++y)
+  //     for (int z = map_->map_param_->box_min_(2) /* + 1 */; z < map_->map_param_->box_max_(2); ++z) {
   Eigen::Vector3i min_idx, max_idx;
-  map_->posToIndex(map_->md_->all_min_, min_idx);
-  map_->posToIndex(map_->md_->all_max_, max_idx);
+  map_->posToIndex(map_->map_data_->all_min_, min_idx);
+  map_->posToIndex(map_->map_data_->all_max_, max_idx);
 
   map_->boundIndex(min_idx);
   map_->boundIndex(max_idx);
   // for (int k = 0; k < 2; ++k) {
-  //   min_idx(k) = max(min(min_idx(k), map_->mp_->box_max_(k) - 1), map_->mp_->box_min_(k));
-  //   max_idx(k) = max(min(max_idx(k), map_->mp_->box_max_(k) - 1), map_->mp_->box_min_(k));
+  //   min_idx(k) = max(min(min_idx(k), map_->map_param_->box_max_(k) - 1), map_->map_param_->box_min_(k));
+  //   max_idx(k) = max(min(max_idx(k), map_->map_param_->box_max_(k) - 1), map_->map_param_->box_min_(k));
   // }
 
   for (int x = min_idx[0]; x <= max_idx[0]; ++x)
     for (int y = min_idx[1]; y <= max_idx[1]; ++y)
       for (int z = min_idx[2]; z <= max_idx[2]; ++z) {
-        if (map_->md_->occupancy_buffer_[map_->toAddress(x, y, z)] >
-            map_->mp_->min_occupancy_log_) {
+        if (map_->map_data_->occupancy_buffer_[map_->toAddress(x, y, z)] >
+            map_->map_param_->min_occupancy_log_) {
           Eigen::Vector3d pos;
           map_->indexToPos(Eigen::Vector3i(x, y, z), pos);
           if (pos(2) > visualization_truncate_height_) continue;
@@ -337,11 +284,11 @@ void MapROS::publishMapAll() {
   // double time_now = (ros::Time::now() - map_start_time_).toSec();
   // double known_volumn = 0;
 
-  // for (int x = map_->mp_->box_min_(0) /* + 1 */; x < map_->mp_->box_max_(0); ++x)
-  //   for (int y = map_->mp_->box_min_(1) /* + 1 */; y < map_->mp_->box_max_(1); ++y)
-  //     for (int z = map_->mp_->box_min_(2) /* + 1 */; z < map_->mp_->box_max_(2); ++z) {
-  //       if (map_->md_->occupancy_buffer_[map_->toAddress(x, y, z)] >
-  //           map_->mp_->clamp_min_log_ - 1e-3)
+  // for (int x = map_->map_param_->box_min_(0) /* + 1 */; x < map_->map_param_->box_max_(0); ++x)
+  //   for (int y = map_->map_param_->box_min_(1) /* + 1 */; y < map_->map_param_->box_max_(1); ++y)
+  //     for (int z = map_->map_param_->box_min_(2) /* + 1 */; z < map_->map_param_->box_max_(2); ++z) {
+  //       if (map_->map_data_->occupancy_buffer_[map_->toAddress(x, y, z)] >
+  //           map_->map_param_->clamp_min_log_ - 1e-3)
   //         known_volumn += 0.1 * 0.1 * 0.1;
   //     }
 
@@ -355,17 +302,17 @@ void MapROS::publishMapLocal() {
   pcl::PointXYZ pt;
   pcl::PointCloud<pcl::PointXYZ> cloud;
   pcl::PointCloud<pcl::PointXYZ> cloud2;
-  Eigen::Vector3i min_cut = map_->md_->local_bound_min_;
-  Eigen::Vector3i max_cut = map_->md_->local_bound_max_;
+  Eigen::Vector3i min_cut = map_->map_data_->local_bound_min_;
+  Eigen::Vector3i max_cut = map_->map_data_->local_bound_max_;
   map_->boundIndex(min_cut);
   map_->boundIndex(max_cut);
 
   // for (int z = min_cut(2); z <= max_cut(2); ++z)
   for (int x = min_cut(0); x <= max_cut(0); ++x)
     for (int y = min_cut(1); y <= max_cut(1); ++y)
-      for (int z = map_->mp_->box_min_(2); z < map_->mp_->box_max_(2); ++z) {
-        if (map_->md_->occupancy_buffer_[map_->toAddress(x, y, z)] >
-            map_->mp_->min_occupancy_log_) {
+      for (int z = map_->map_param_->box_min_(2); z < map_->map_param_->box_max_(2); ++z) {
+        if (map_->map_data_->occupancy_buffer_[map_->toAddress(x, y, z)] >
+            map_->map_param_->min_occupancy_log_) {
           // Occupied cells
           Eigen::Vector3d pos;
           map_->indexToPos(Eigen::Vector3i(x, y, z), pos);
@@ -379,7 +326,7 @@ void MapROS::publishMapLocal() {
         }
 
         if (map_local_inflate_pub_.getNumSubscribers() > 0) {
-          if (map_->md_->occupancy_buffer_inflate_[map_->toAddress(x, y, z)] == 1) {
+          if (map_->map_data_->occupancy_buffer_inflate_[map_->toAddress(x, y, z)] == 1) {
             // Inflated occupied cells
             Eigen::Vector3d pos;
             map_->indexToPos(Eigen::Vector3i(x, y, z), pos);
@@ -417,8 +364,8 @@ void MapROS::publishFree() {
   pcl::PointXYZ pt;
   pcl::PointCloud<pcl::PointXYZ> unknown, free;
   Eigen::Vector3i min_idx, max_idx;
-  map_->posToIndex(map_->md_->all_min_, min_idx);
-  map_->posToIndex(map_->md_->all_max_, max_idx);
+  map_->posToIndex(map_->map_data_->all_min_, min_idx);
+  map_->posToIndex(map_->map_data_->all_max_, max_idx);
 
   map_->boundIndex(min_idx);
   map_->boundIndex(max_idx);
@@ -429,10 +376,10 @@ void MapROS::publishFree() {
   for (int x = min_idx(0); x <= max_idx(0); ++x)
     for (int y = min_idx(1); y <= max_idx(1); ++y)
       for (int z = min_idx(2); z <= max_idx(2); ++z) {
-        if (map_->md_->occupancy_buffer_[map_->toAddress(x, y, z)] <=
-                map_->mp_->min_occupancy_log_ &&
-            map_->md_->occupancy_buffer_[map_->toAddress(x, y, z)] >=
-                map_->mp_->clamp_min_log_ - 1e-3) {
+        if (map_->map_data_->occupancy_buffer_[map_->toAddress(x, y, z)] <=
+                map_->map_param_->min_occupancy_log_ &&
+            map_->map_data_->occupancy_buffer_[map_->toAddress(x, y, z)] >=
+                map_->map_param_->clamp_min_log_ - 1e-3) {
           Eigen::Vector3d pos;
           map_->indexToPos(Eigen::Vector3i(x, y, z), pos);
           if (pos(2) > visualization_truncate_height) continue;
@@ -458,8 +405,8 @@ void MapROS::publishUnknown() {
   pcl::PointXYZ pt;
   pcl::PointCloud<pcl::PointXYZ> cloud;
   Eigen::Vector3i min_idx, max_idx;
-  map_->posToIndex(map_->md_->all_min_, min_idx);
-  map_->posToIndex(map_->md_->all_max_, max_idx);
+  map_->posToIndex(map_->map_data_->all_min_, min_idx);
+  map_->posToIndex(map_->map_data_->all_max_, max_idx);
 
   map_->boundIndex(min_idx);
   map_->boundIndex(max_idx);
@@ -467,8 +414,8 @@ void MapROS::publishUnknown() {
   for (int x = min_idx(0); x <= max_idx(0); ++x)
     for (int y = min_idx(1); y <= max_idx(1); ++y)
       for (int z = min_idx(2); z <= max_idx(2); ++z) {
-        if (map_->md_->occupancy_buffer_[map_->toAddress(x, y, z)] <
-            map_->mp_->clamp_min_log_ - 1e-3) {
+        if (map_->map_data_->occupancy_buffer_[map_->toAddress(x, y, z)] <
+            map_->map_param_->clamp_min_log_ - 1e-3) {
           Eigen::Vector3d pos;
           map_->indexToPos(Eigen::Vector3i(x, y, z), pos);
           if (pos(2) > visualization_truncate_height_) continue;
@@ -506,8 +453,8 @@ void MapROS::publishDepth() {
 void MapROS::publishUpdateRange() {
   Eigen::Vector3d esdf_min_pos, esdf_max_pos, cube_pos, cube_scale;
   visualization_msgs::Marker mk;
-  map_->indexToPos(map_->md_->local_bound_min_, esdf_min_pos);
-  map_->indexToPos(map_->md_->local_bound_max_, esdf_max_pos);
+  map_->indexToPos(map_->map_data_->local_bound_min_, esdf_min_pos);
+  map_->indexToPos(map_->map_data_->local_bound_max_, esdf_max_pos);
 
   cube_pos = 0.5 * (esdf_min_pos + esdf_max_pos);
   cube_scale = esdf_max_pos - esdf_min_pos;
@@ -543,11 +490,11 @@ void MapROS::publishESDF() {
   const double max_dist = 3.0;
 
   Eigen::Vector3i min_cut =
-      map_->md_->local_bound_min_ - Eigen::Vector3i(map_->mp_->local_map_margin_,
-                                        map_->mp_->local_map_margin_, map_->mp_->local_map_margin_);
+      map_->map_data_->local_bound_min_ - Eigen::Vector3i(map_->map_param_->local_map_margin_,
+                                        map_->map_param_->local_map_margin_, map_->map_param_->local_map_margin_);
   Eigen::Vector3i max_cut =
-      map_->md_->local_bound_max_ + Eigen::Vector3i(map_->mp_->local_map_margin_,
-                                        map_->mp_->local_map_margin_, map_->mp_->local_map_margin_);
+      map_->map_data_->local_bound_max_ + Eigen::Vector3i(map_->map_param_->local_map_margin_,
+                                        map_->map_param_->local_map_margin_, map_->map_param_->local_map_margin_);
   map_->boundIndex(min_cut);
   map_->boundIndex(max_cut);
 

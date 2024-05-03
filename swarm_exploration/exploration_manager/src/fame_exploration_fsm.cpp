@@ -8,11 +8,15 @@
 #include <exploration_manager/HGrid.h>
 #include <exploration_manager/GridTour.h>
 
-#include <plan_env/edt_environment.h>
+#include <mrs_msgs/TrajectoryReferenceSrv.h>
+#include <mrs_msgs/ReferenceStampedSrv.h>
+
 #include <plan_env/sdf_map.h>
 #include <plan_env/multi_map_manager.h>
 #include <active_perception/perception_utils.h>
 #include <active_perception/hgrid.h>
+
+
 
 #include <std_msgs/Bool.h>
 #include <fstream>
@@ -22,19 +26,19 @@ using Eigen::Vector4d;
 namespace fast_planner {
 
 void FameExplorationFSM::init(ros::NodeHandle& nh) {
-  fp_.reset(new FSMParam);
-  fd_.reset(new FSMData);
+  fame_params_.reset(new FSMParam);
+  fame_data_.reset(new FSMData);
 
   /*  Fsm param  */
-  nh.param("fsm/thresh_replan1", fp_->replan_thresh1_, -1.0);
-  nh.param("fsm/thresh_replan2", fp_->replan_thresh2_, -1.0);
-  nh.param("fsm/thresh_replan3", fp_->replan_thresh3_, -1.0);
-  nh.param("fsm/replan_time", fp_->replan_time_, -1.0);
-  nh.param("fsm/attempt_interval", fp_->attempt_interval_, 0.2);
-  nh.param("fsm/pair_opt_interval", fp_->pair_opt_interval_, 1.0);
-  nh.param("fsm/repeat_send_num", fp_->repeat_send_num_, 10);
+  nh.param("fsm/thresh_replan1", fame_params_->replan_thresh1_, -1.0);
+  nh.param("fsm/thresh_replan2", fame_params_->replan_thresh2_, -1.0);
+  nh.param("fsm/thresh_replan3", fame_params_->replan_thresh3_, -1.0);
+  nh.param("fsm/replan_time", fame_params_->replan_time_, -1.0);
+  nh.param("fsm/attempt_interval", fame_params_->attempt_interval_, 0.2);
+  nh.param("fsm/pair_opt_interval", fame_params_->pair_opt_interval_, 1.0);
+  nh.param("fsm/repeat_send_num", fame_params_->repeat_send_num_, 10);
   nh.param(
-      "fsm/communication_range", fp_->communication_range_, std::numeric_limits<double>::max());
+      "fsm/communication_range", fame_params_->communication_range_, std::numeric_limits<double>::max());
 
   /* Initialize main modules */
   expl_manager_.reset(new FameExplorationManager);
@@ -42,16 +46,18 @@ void FameExplorationFSM::init(ros::NodeHandle& nh) {
   visualization_.reset(new PlanningVisualization(nh));
   coll_assigner_.reset(new CollaborationAssigner(nh));
 
+
+
+
   planner_manager_ = expl_manager_->planner_manager_;
   state_ = EXPL_STATE::INIT;
 
-  fd_->have_odom_ = false;
-  fd_->state_str_ = { "INIT", "WAIT_TRIGGER", "PLAN_TRAJ", "PUB_TRAJ", "EXEC_TRAJ", "FINISH",
-    "IDLE" };
-  fd_->static_state_ = true;
-  fd_->trigger_ = false;
-  fd_->avoid_collision_ = false;
-  fd_->go_back_ = false;
+  fame_data_->have_odom_ = false;
+  fame_data_->state_str_ = { "INIT", "WAIT_TRIGGER", "PLAN_TRAJ", "PUB_TRAJ", "EXEC_TRAJ", "FINISH","IDLE" };
+  fame_data_->static_state_ = true;
+  fame_data_->trigger_ = false;
+  fame_data_->avoid_collision_ = true;
+  fame_data_->go_back_ = false;
 
   num_fail_ = 0;
 
@@ -61,8 +67,6 @@ void FameExplorationFSM::init(ros::NodeHandle& nh) {
   frontier_timer_ = nh.createTimer(ros::Duration(0.1), &FameExplorationFSM::frontierCallback, this);
   heartbit_timer_ = nh.createTimer(ros::Duration(1.0), &FameExplorationFSM::heartbitCallback, this);
 
-  trigger_sub_ =
-      nh.subscribe("/move_base_simple/goal", 1, &FameExplorationFSM::triggerCallback, this);
   odom_sub_ = nh.subscribe("/odom_world", 1, &FameExplorationFSM::odometryCallback, this);
 
   replan_pub_ = nh.advertise<std_msgs::Empty>("/planning/replan", 10);
@@ -70,6 +74,8 @@ void FameExplorationFSM::init(ros::NodeHandle& nh) {
   bspline_pub_ = nh.advertise<bspline::Bspline>("/planning/bspline", 10);
   stop_pub_ = nh.advertise<std_msgs::Int32>("/stop", 1000);
   heartbit_pub_ = nh.advertise<std_msgs::Empty>("/heartbit", 100);
+  pose_pub_ = nh.advertise<geometry_msgs::Pose>("/uav1/fame/explore_target", 10);
+
 
   emergency_handler_pub_ = nh.advertise<std_msgs::Bool>("/trigger_emergency", 10);
 
@@ -124,27 +130,37 @@ void FameExplorationFSM::sendEmergencyMsg(bool emergency) {
 
 void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
   ROS_INFO_STREAM_THROTTLE(
-      1.0, "[FSM]: Drone " << getId() << " state: " << fd_->state_str_[int(state_)]);
+      1.0, "[FSM]: Drone " << getId() << " state: " << fame_data_->state_str_[int(state_)]);
 
   switch (state_) {
     case INIT: {
       // Wait for odometry ready
-      if (!fd_->have_odom_) {
+      if (!fame_data_->have_odom_) {
         ROS_WARN_THROTTLE(1.0, "no odom");
         return;
       }
-      if ((ros::Time::now() - fd_->fsm_init_time_).toSec() < 2.0) {
+      if ((ros::Time::now() - fame_data_->fsm_init_time_).toSec() < 2.0) {
         ROS_WARN_THROTTLE(1.0, "wait for init");
         return;
       }
       // Go to wait trigger when odom is ok
       transitState(WAIT_TRIGGER, "FSM");
+
       break;
     }
 
     case WAIT_TRIGGER: {
       // Do nothing but wait for trigger
       ROS_WARN_THROTTLE(1.0, "wait for trigger.");
+        fame_data_->trigger_ = true;
+        cout << "Triggered!" << endl;
+        fame_data_->start_pos_ = fame_data_->odom_pos_;
+        // ROS_WARN_STREAM("Start expl pos: " << fame_data_->start_pos_.transpose());
+
+        if (expl_manager_->updateFrontierStruct(fame_data_->odom_pos_, fame_data_->odom_yaw_, fame_data_->odom_vel_) != 0) {
+        transitState(PLAN_TRAJ, "triggerCallback");
+  } else
+    transitState(FINISH, "triggerCallback");
       break;
     }
 
@@ -155,10 +171,10 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
     }
 
     case IDLE: {
-      double check_interval = (ros::Time::now() - fd_->last_check_frontier_time_).toSec();
+      double check_interval = (ros::Time::now() - fame_data_->last_check_frontier_time_).toSec();
 
       // Check: if we don't have any frontier, then stop
-      if (expl_manager_->updateFrontierStruct(fd_->odom_pos_, fd_->odom_yaw_, fd_->odom_vel_) <=
+      if (expl_manager_->updateFrontierStruct(fame_data_->odom_pos_, fame_data_->odom_yaw_, fame_data_->odom_vel_) <=
           1) {
         ROS_WARN_THROTTLE(1., "No frontiers for agent %d", getId());
         sendStopMsg(1);
@@ -166,44 +182,37 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       }
 
       if (check_interval > 100.0) {
-        // if (!expl_manager_->updateFrontierStruct(fd_->odom_pos_)) {
         ROS_WARN("Go back to (0,0,1)");
-        // if (getId() == 1) {
-        //   expl_manager_->ed_->next_pos_ = Eigen::Vector3d(-3, 1.9, 1);
-        // } else
-        // expl_manager_->ed_->next_pos_ = Eigen::Vector3d(0, 0.0, 1);
-        // Eigen::Vector3d dir = (fd_->start_pos_ - fd_->odom_pos_);
-        // expl_manager_->ed_->next_yaw_ = atan2(dir[1], dir[0]);
 
-        expl_manager_->ed_->next_pos_ = fd_->start_pos_;
+        expl_manager_->ed_->next_pos_ = fame_data_->start_pos_;
         expl_manager_->ed_->next_yaw_ = 0.0;
 
-        fd_->go_back_ = true;
+        fame_data_->go_back_ = true;
         transitState(PLAN_TRAJ, "FSM");
         // } else {
-        //   fd_->last_check_frontier_time_ = ros::Time::now();
+        //   fame_data_->last_check_frontier_time_ = ros::Time::now();
         // }
       }
       break;
     }
 
     case PLAN_TRAJ: {
-      if (fd_->static_state_) {
+      if (fame_data_->static_state_) {
         // Plan from static state (hover)
-        fd_->start_pt_ = fd_->odom_pos_;
-        fd_->start_vel_ = fd_->odom_vel_;
-        fd_->start_acc_.setZero();
-        fd_->start_yaw_ << fd_->odom_yaw_, 0, 0;
+        fame_data_->start_pt_ = fame_data_->odom_pos_;
+        fame_data_->start_vel_ = fame_data_->odom_vel_;
+        fame_data_->start_acc_.setZero();
+        fame_data_->start_yaw_ << fame_data_->odom_yaw_, 0, 0;
       } else {
         // Replan from non-static state, starting from 'replan_time' seconds later
         LocalTrajData* info = &planner_manager_->local_data_;
-        double t_r = (ros::Time::now() - info->start_time_).toSec() + fp_->replan_time_;
-        fd_->start_pt_ = info->position_traj_.evaluateDeBoorT(t_r);
-        fd_->start_vel_ = info->velocity_traj_.evaluateDeBoorT(t_r);
-        fd_->start_acc_ = info->acceleration_traj_.evaluateDeBoorT(t_r);
-        fd_->start_yaw_(0) = info->yaw_traj_.evaluateDeBoorT(t_r)[0];
-        fd_->start_yaw_(1) = info->yawdot_traj_.evaluateDeBoorT(t_r)[0];
-        fd_->start_yaw_(2) = info->yawdotdot_traj_.evaluateDeBoorT(t_r)[0];
+        double t_r = (ros::Time::now() - info->start_time_).toSec() + fame_params_->replan_time_;
+        fame_data_->start_pt_ = info->position_traj_.evaluateDeBoorT(t_r);
+        fame_data_->start_vel_ = info->velocity_traj_.evaluateDeBoorT(t_r);
+        fame_data_->start_acc_ = info->acceleration_traj_.evaluateDeBoorT(t_r);
+        fame_data_->start_yaw_(0) = info->yaw_traj_.evaluateDeBoorT(t_r)[0];
+        fame_data_->start_yaw_(1) = info->yawdot_traj_.evaluateDeBoorT(t_r)[0];
+        fame_data_->start_yaw_(2) = info->yawdotdot_traj_.evaluateDeBoorT(t_r)[0];
       }
       // Inform traj_server the replanning
       replan_pub_.publish(std_msgs::Empty());
@@ -215,7 +224,7 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
         sendEmergencyMsg(false);
 
       } else if (res == FAIL) {  // Keep trying to replan
-        fd_->static_state_ = true;
+        fame_data_->static_state_ = true;
         ROS_WARN_THROTTLE(1., "Plan fail (drone %d)", getId());
         // Check if we need to send a message
         if (num_fail_ > 10) {
@@ -226,8 +235,8 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
         }
 
       } else if (res == NO_GRID) {
-        fd_->static_state_ = true;
-        fd_->last_check_frontier_time_ = ros::Time::now();
+        fame_data_->static_state_ = true;
+        fame_data_->last_check_frontier_time_ = ros::Time::now();
         // ROS_WARN("No grid (drone %d)", getId());
         transitState(IDLE, "FSM");
 
@@ -241,14 +250,14 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
     }
 
     case PUB_TRAJ: {
-      double dt = (ros::Time::now() - fd_->newest_traj_.start_time).toSec();
+      double dt = (ros::Time::now() - fame_data_->newest_traj_.start_time).toSec();
       if (dt > 0) {
-        bspline_pub_.publish(fd_->newest_traj_);
-        fd_->static_state_ = false;
+        bspline_pub_.publish(fame_data_->newest_traj_);
+        fame_data_->static_state_ = false;
 
-        // fd_->newest_traj_.drone_id = planner_manager_->swarm_traj_data_.drone_id_;
-        fd_->newest_traj_.drone_id = expl_manager_->ep_->drone_id_;
-        swarm_traj_pub_.publish(fd_->newest_traj_);
+        // fame_data_->newest_traj_.drone_id = planner_manager_->swarm_traj_data_.drone_id_;
+        fame_data_->newest_traj_.drone_id = expl_manager_->ep_->drone_id_;
+        swarm_traj_pub_.publish(fame_data_->newest_traj_);
 
         thread vis_thread(&FameExplorationFSM::visualize, this, 2);
         vis_thread.detach();
@@ -260,26 +269,30 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
     case EXEC_TRAJ: {
       auto tn = ros::Time::now();
       // Check whether replan is needed
+      // ROS_WARN("Vector: x=%f, y=%f, z=%f", expl_manager_->ed_->next_pos_.x(), expl_manager_->ed_->next_pos_.y(), expl_manager_->ed_->next_pos_.z());
+      geometry_msgs::Pose pose =  mrsFly(expl_manager_->ed_->next_pos_);
+      pose_pub_.publish(pose);
+
       LocalTrajData* info = &planner_manager_->local_data_;
       double t_cur = (tn - info->start_time_).toSec();
 
-      if (!fd_->go_back_) {
+      if (!fame_data_->go_back_) {
         bool need_replan = false;
-        if (t_cur > fp_->replan_thresh2_ && expl_manager_->frontier_finder_->isFrontierCovered()) {
+        if (t_cur > fame_params_->replan_thresh2_ && expl_manager_->frontier_finder_->isFrontierCovered()) {
           // ROS_WARN("Replan: cluster covered=====================================");
           need_replan = true;
-        } else if (info->duration_ - t_cur < fp_->replan_thresh1_) {
+        } else if (info->duration_ - t_cur < fame_params_->replan_thresh1_) {
           // Replan if traj is almost fully executed
           // ROS_WARN("Replan: traj fully executed=================================");
           need_replan = true;
-        } else if (t_cur > fp_->replan_thresh3_) {
+        } else if (t_cur > fame_params_->replan_thresh3_) {
           // Replan after some time
           // ROS_WARN("Replan: periodic call=======================================");
           need_replan = true;
         }
 
         if (need_replan) {
-          if (expl_manager_->updateFrontierStruct(fd_->odom_pos_, fd_->odom_yaw_, fd_->odom_vel_) !=
+          if (expl_manager_->updateFrontierStruct(fame_data_->odom_pos_, fame_data_->odom_yaw_, fame_data_->odom_vel_) !=
               0) {
             // Update frontier and plan new motion
             thread vis_thread(&FameExplorationFSM::visualize, this, 1);
@@ -287,10 +300,10 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
             transitState(PLAN_TRAJ, "FSM");
           } else {
             // No frontier detected, finish exploration
-            fd_->last_check_frontier_time_ = ros::Time::now();
+            fame_data_->last_check_frontier_time_ = ros::Time::now();
             transitState(IDLE, "FSM");
             ROS_WARN_THROTTLE(1., "Idle since no frontier is detected");
-            fd_->static_state_ = true;
+            fame_data_->static_state_ = true;
             replan_pub_.publish(std_msgs::Empty());
             sendStopMsg(1);
           }
@@ -306,7 +319,7 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
           transitState(FINISH, "FSM");
           return;
         }
-        if (t_cur > fp_->replan_thresh3_ || info->duration_ - t_cur < fp_->replan_thresh1_) {
+        if (t_cur > fame_params_->replan_thresh3_ || info->duration_ - t_cur < fame_params_->replan_thresh1_) {
           // Replan for going back
           replan_pub_.publish(std_msgs::Empty());
           transitState(PLAN_TRAJ, "FSM");
@@ -321,16 +334,16 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
 }
 
 int FameExplorationFSM::callExplorationPlanner() {
-  ros::Time time_r = ros::Time::now() + ros::Duration(fp_->replan_time_);
+  ros::Time time_r = ros::Time::now() + ros::Duration(fame_params_->replan_time_);
 
   int res;
-  if (fd_->avoid_collision_ || fd_->go_back_) {  // Only replan trajectory
-    res = expl_manager_->planTrajToView(fd_->start_pt_, fd_->start_vel_, fd_->start_acc_,
-        fd_->start_yaw_, expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
-    fd_->avoid_collision_ = false;
+  if (fame_data_->avoid_collision_ || fame_data_->go_back_) {  // Only replan trajectory
+    res = expl_manager_->planTrajToView(fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_,
+        fame_data_->start_yaw_, expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
+    fame_data_->avoid_collision_ = false;
   } else {  // Do full planning normally
     res = expl_manager_->planExploreMotion(
-        fd_->start_pt_, fd_->start_vel_, fd_->start_acc_, fd_->start_yaw_);
+        fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_, fame_data_->start_yaw_);
   }
 
   if (res == SUCCEED) {
@@ -342,8 +355,16 @@ int FameExplorationFSM::callExplorationPlanner() {
     bspline.start_time = info->start_time_;
     bspline.traj_id = info->traj_id_;
     Eigen::MatrixXd pos_pts = info->position_traj_.getControlPoint();
+    
+
+
     for (int i = 0; i < pos_pts.rows(); ++i) {
       geometry_msgs::Point pt;
+      mrs_msgs::Reference pose;
+      pose.position.x = pos_pts(i, 0);
+      pose.position.y = pos_pts(i, 1);
+      pose.position.z = pos_pts(i, 2);
+      pose.heading    = 0;
       pt.x = pos_pts(i, 0);
       pt.y = pos_pts(i, 1);
       pt.z = pos_pts(i, 2);
@@ -359,7 +380,7 @@ int FameExplorationFSM::callExplorationPlanner() {
       bspline.yaw_pts.push_back(yaw);
     }
     bspline.yaw_dt = info->yaw_traj_.getKnotSpan();
-    fd_->newest_traj_ = bspline;
+    fame_data_->newest_traj_ = bspline;
   }
   return res;
 }
@@ -384,23 +405,9 @@ void FameExplorationFSM::visualize(int content) {
       auto color = visualization_->getColor(double(i) / ed_ptr->frontiers_.size(), 0.4);
       visualization_->drawCubes(ed_ptr->frontiers_[i], res, color, "frontier", i, 4);
 
-      // getColorVal(i, expl_manager_->ep_->drone_num_, expl_manager_->ep_->drone_id_)
-      // double(i) / ed_ptr->frontiers_.size()
-
-      // visualization_->drawBox(ed_ptr->frontier_boxes_[i].first,
-      // ed_ptr->frontier_boxes_[i].second,
-      //   color, "frontier_boxes", i, 4);
-
-      // auto id_str = std::to_string(ed_ptr->fronters_ids_[i]);
-      // visualization_->drawText(ed_ptr->frontiers_[i][0] - Eigen::Vector3d(0., 0., 0.), id_str,
-      // 0.5, Eigen::Vector4d::Ones(), "id", ed_ptr->frontiers_.size() + i, 4);
     }
     for (int i = ed_ptr->frontiers_.size(); i < last_ftr_num; ++i) {
       visualization_->drawCubes({}, res, Vector4d(0, 0, 0, 1), "frontier", i, 4);
-      // visualization_->drawBox(Vector3d(0, 0, 0), Vector3d(0, 0, 0), Vector4d(1, 0, 0, 0.3),
-      //   "frontier_boxes", i, 4);
-      // visualization_->drawText(ed_ptr->frontiers_[i][0] - Eigen::Vector3d(0., 0., 0.), "", 0.5,
-      // Eigen::Vector4d::Ones(), "id", i + 1, 4);
     }
     last_ftr_num = ed_ptr->frontiers_.size();
 
@@ -437,7 +444,7 @@ void FameExplorationFSM::visualize(int content) {
 
     // Publish role
     const std::string role_str = roleToString(expl_manager_->role_);
-    visualization_->drawText(fd_->odom_pos_ - Eigen::Vector3d(1., 0., 0.), role_str, 0.4,
+    visualization_->drawText(fame_data_->odom_pos_ - Eigen::Vector3d(1., 0., 0.), role_str, 0.4,
         Eigen::Vector4d::Ones(), "role", 0, 8);
 
     // Publish current goal
@@ -457,11 +464,6 @@ void FameExplorationFSM::visualize(int content) {
 
   } else if (content == 2) {
 
-    // Hierarchical grid and global tour --------------------------------
-    // vector<Eigen::Vector3d> pts1, pts2;
-    // expl_manager_->uniform_grid_->getPath(pts1, pts2);
-    // visualization_->drawLines(pts1, pts2, 0.05, Eigen::Vector4d(1, 0.3, 0, 1), "partition", 0,
-    // 6);
 
     if (expl_manager_->ep_->drone_id_ == 1) {
       vector<Eigen::Vector3d> pts1, pts2;
@@ -481,21 +483,6 @@ void FameExplorationFSM::visualize(int content) {
       }
       last_text_num = pts.size();
 
-      // // Pub hgrid to ground node
-      // exploration_manager::HGrid hgrid;
-      // hgrid.stamp = ros::Time::now().toSec();
-      // for (int i = 0; i < pts1.size(); ++i) {
-      //   geometry_msgs::Point pt1, pt2;
-      //   pt1.x = pts1[i][0];
-      //   pt1.y = pts1[i][1];
-      //   pt1.z = pts1[i][2];
-      //   hgrid.points1.push_back(pt1);
-      //   pt2.x = pts2[i][0];
-      //   pt2.y = pts2[i][1];
-      //   pt2.z = pts2[i][2];
-      //   hgrid.points2.push_back(pt2);
-      // }
-      // hgrid_pub_.publish(hgrid);
     }
 
     auto grid_tour = expl_manager_->ed_->grid_tour_;
@@ -527,32 +514,33 @@ void FameExplorationFSM::visualize(int content) {
   }
 }
 
+geometry_msgs::Pose FameExplorationFSM::mrsFly(Vector3d& pos) {
+    geometry_msgs::Pose pose_msg;
+    pose_msg.position.x = pos.x();
+    pose_msg.position.y = pos.y();
+    pose_msg.position.z = pos.z();
+    pose_msg.orientation.w    = 1.0;
+    pose_msg.orientation.x    = 0.0;
+    pose_msg.orientation.y    = 0.0;
+    pose_msg.orientation.z    = 0.0;
+  return pose_msg;
+}
+
 void FameExplorationFSM::clearVisMarker() {
   for (int i = 0; i < 10; ++i) {
     visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 1), "frontier", i, 4);
-    // visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 1), "dead_frontier", i, 4);
-    // visualization_->drawBox(Vector3d(0, 0, 0), Vector3d(0, 0, 0), Vector4d(1, 0, 0, 0.3),
-    //   "frontier_boxes", i, 4);
   }
   for (int i = 0; i < 10; ++i) {
     visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 1), "lebeled_frontier", i, 7);
-    // visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 1), "dead_frontier", i, 4);
-    // visualization_->drawBox(Vector3d(0, 0, 0), Vector3d(0, 0, 0), Vector4d(1, 0, 0, 0.3),
-    //   "frontier_boxes", i, 4);
   }
-  // visualization_->drawSpheres({}, 0.2, Vector4d(0, 0.5, 0, 1), "points", 0, 6);
   visualization_->drawLines({}, 0.07, Vector4d(0, 0.5, 0, 1), "frontier_tour", 0, 6);
   visualization_->drawLines({}, 0.07, Vector4d(0, 0.5, 0, 1), "grid_tour", 0, 6);
-  // visualization_->drawSpheres({}, 0.2, Vector4d(0, 0, 1, 1), "refined_pts", 0, 6);
-  // visualization_->drawLines({}, {}, 0.05, Vector4d(0.5, 0, 1, 1), "refined_view", 0, 6);
-  // visualization_->drawLines({}, 0.07, Vector4d(0, 0, 1, 1), "refined_tour", 0, 6);
   visualization_->drawSpheres({}, 0.1, Vector4d(0, 0, 1, 1), "B-Spline", 0, 0);
 
-  // visualization_->drawLines({}, {}, 0.03, Vector4d(1, 0, 0, 1), "current_pose", 0, 6);
 }
 
 void FameExplorationFSM::frontierCallback(const ros::TimerEvent& e) {
-  if (state_ == WAIT_TRIGGER) {
+  if (state_ == INIT) {
     auto ft = expl_manager_->frontier_finder_;
     auto ed = expl_manager_->ed_;
 
@@ -562,20 +550,9 @@ void FameExplorationFSM::frontierCallback(const ros::TimerEvent& e) {
       return a + b * double(id) / ed->frontiers_.size();
     };
 
-    // ft->searchFrontiers();
-    // ft->computeFrontiersToVisit();
-    // ft->updateFrontierCostMatrix();
 
-    // ft->getFrontiers(ed->frontiers_);
-    // ft->getFrontierBoxes(ed->frontier_boxes_);
+    expl_manager_->updateFrontierStruct(fame_data_->odom_pos_, fame_data_->odom_yaw_, fame_data_->odom_vel_);
 
-    expl_manager_->updateFrontierStruct(fd_->odom_pos_, fd_->odom_yaw_, fd_->odom_vel_);
-
-    // cout << "odom: " << fd_->odom_pos_.transpose() << endl;
-    // vector<int> tmp_id1;
-    // vector<vector<int>> tmp_id2;
-    // bool status = expl_manager_->findGlobalTourOfGrid(
-    //     { fd_->odom_pos_ }, { fd_->odom_vel_ }, tmp_id1, tmp_id2, true);
 
     // Draw frontier and bounding box
     auto res = expl_manager_->sdf_map_->getResolution();
@@ -611,42 +588,11 @@ void FameExplorationFSM::frontierCallback(const ros::TimerEvent& e) {
     }
 
     visualize(2);
-    // if (status)
-    //   visualize(2);
-    // else
-    //   visualization_->drawLines({}, 0.07, Vector4d(0, 0.5, 0, 1), "grid_tour", 0, 6);
-
-    // Draw grid tour
   }
 }
 
 void FameExplorationFSM::heartbitCallback(const ros::TimerEvent& e) {
   heartbit_pub_.publish(std_msgs::Empty());
-}
-
-void FameExplorationFSM::triggerCallback(const geometry_msgs::PoseStampedConstPtr& msg) {
-
-  // // Debug traj planner
-  // Eigen::Vector3d pos;
-  // pos << msg->pose.position.x, msg->pose.position.y, 1;
-  // expl_manager_->ed_->next_pos_ = pos;
-
-  // Eigen::Vector3d dir = pos - fd_->odom_pos_;
-  // expl_manager_->ed_->next_yaw_ = atan2(dir[1], dir[0]);
-  // fd_->go_back_ = true;
-  // transitState(PLAN_TRAJ, "triggerCallback");
-  // return;
-
-  if (state_ != WAIT_TRIGGER) return;
-  fd_->trigger_ = true;
-  cout << "Triggered!" << endl;
-  fd_->start_pos_ = fd_->odom_pos_;
-  // ROS_WARN_STREAM("Start expl pos: " << fd_->start_pos_.transpose());
-
-  if (expl_manager_->updateFrontierStruct(fd_->odom_pos_, fd_->odom_yaw_, fd_->odom_vel_) != 0) {
-    transitState(PLAN_TRAJ, "triggerCallback");
-  } else
-    transitState(FINISH, "triggerCallback");
 }
 
 void FameExplorationFSM::safetyCallback(const ros::TimerEvent& e) {
@@ -656,12 +602,12 @@ void FameExplorationFSM::safetyCallback(const ros::TimerEvent& e) {
     bool safe = planner_manager_->checkTrajCollision(dist);
     if (!safe) {
       // ROS_WARN("Replan: collision detected==================================");
-      fd_->avoid_collision_ = true;
+      fame_data_->avoid_collision_ = true;
       transitState(PLAN_TRAJ, "safetyCallback");
     }
 
     static auto time_check = ros::Time::now();
-    if (expl_manager_->sdf_map_->getOccupancy(fd_->odom_pos_) != SDFMap::OCCUPANCY::FREE) {
+    if (expl_manager_->sdf_map_->getOccupancy(fame_data_->odom_pos_) != SDFMap::OCCUPANCY::FREE) {
       if ((ros::Time::now() - time_check).toSec() > 20.) {
         sendStopMsg(-1);
       }
@@ -672,25 +618,25 @@ void FameExplorationFSM::safetyCallback(const ros::TimerEvent& e) {
 }
 
 void FameExplorationFSM::odometryCallback(const nav_msgs::OdometryConstPtr& msg) {
-  fd_->odom_pos_(0) = msg->pose.pose.position.x;
-  fd_->odom_pos_(1) = msg->pose.pose.position.y;
-  fd_->odom_pos_(2) = msg->pose.pose.position.z;
+  fame_data_->odom_pos_(0) = msg->pose.pose.position.x;
+  fame_data_->odom_pos_(1) = msg->pose.pose.position.y;
+  fame_data_->odom_pos_(2) = msg->pose.pose.position.z;
 
-  fd_->odom_vel_(0) = msg->twist.twist.linear.x;
-  fd_->odom_vel_(1) = msg->twist.twist.linear.y;
-  fd_->odom_vel_(2) = msg->twist.twist.linear.z;
+  fame_data_->odom_vel_(0) = msg->twist.twist.linear.x;
+  fame_data_->odom_vel_(1) = msg->twist.twist.linear.y;
+  fame_data_->odom_vel_(2) = msg->twist.twist.linear.z;
 
-  fd_->odom_orient_.w() = msg->pose.pose.orientation.w;
-  fd_->odom_orient_.x() = msg->pose.pose.orientation.x;
-  fd_->odom_orient_.y() = msg->pose.pose.orientation.y;
-  fd_->odom_orient_.z() = msg->pose.pose.orientation.z;
+  fame_data_->odom_orient_.w() = msg->pose.pose.orientation.w;
+  fame_data_->odom_orient_.x() = msg->pose.pose.orientation.x;
+  fame_data_->odom_orient_.y() = msg->pose.pose.orientation.y;
+  fame_data_->odom_orient_.z() = msg->pose.pose.orientation.z;
 
-  Eigen::Vector3d rot_x = fd_->odom_orient_.toRotationMatrix().block<3, 1>(0, 0);
-  fd_->odom_yaw_ = atan2(rot_x(1), rot_x(0));
+  Eigen::Vector3d rot_x = fame_data_->odom_orient_.toRotationMatrix().block<3, 1>(0, 0);
+  fame_data_->odom_yaw_ = atan2(rot_x(1), rot_x(0));
 
-  if (!fd_->have_odom_) {
-    fd_->have_odom_ = true;
-    fd_->fsm_init_time_ = ros::Time::now();
+  if (!fame_data_->have_odom_) {
+    fame_data_->have_odom_ = true;
+    fame_data_->fsm_init_time_ = ros::Time::now();
   }
 }
 
@@ -699,7 +645,7 @@ void FameExplorationFSM::transitState(EXPL_STATE new_state, string pos_call) {
   state_ = new_state;
   ROS_INFO_STREAM("[" + pos_call + "]: Drone "
                   << getId()
-                  << " from " + fd_->state_str_[pre_s] + " to " + fd_->state_str_[int(new_state)]);
+                  << " from " + fame_data_->state_str_[pre_s] + " to " + fame_data_->state_str_[int(new_state)]);
 }
 
 void FameExplorationFSM::droneStateTimerCallback(const ros::TimerEvent& e) {
@@ -709,10 +655,10 @@ void FameExplorationFSM::droneStateTimerCallback(const ros::TimerEvent& e) {
 
   auto& state = expl_manager_->ed_->swarm_state_[msg.drone_id - 1];
 
-  if (fd_->static_state_) {
-    state.pos_ = fd_->odom_pos_;
-    state.vel_ = fd_->odom_vel_;
-    state.yaw_ = fd_->odom_yaw_;
+  if (fame_data_->static_state_) {
+    state.pos_ = fame_data_->odom_pos_;
+    state.vel_ = fame_data_->odom_vel_;
+    state.yaw_ = fame_data_->odom_yaw_;
   } else {
     LocalTrajData* info = &planner_manager_->local_data_;
     double t_r = (ros::Time::now() - info->start_time_).toSec();
@@ -742,7 +688,7 @@ void FameExplorationFSM::droneStateMsgCallback(const exploration_manager::DroneS
 
   // Simulate swarm communication loss
   const Eigen::Vector3d msg_pos(msg->pos[0], msg->pos[1], msg->pos[2]);
-  if ((msg_pos - fd_->odom_pos_).norm() > fp_->communication_range_) {
+  if ((msg_pos - fame_data_->odom_pos_).norm() > fame_params_->communication_range_) {
     return;
   }
 
@@ -774,7 +720,7 @@ void FameExplorationFSM::optTimerCallback(const ros::TimerEvent& e) {
   auto tn = ros::Time::now().toSec();
 
   // Avoid frequent attempt
-  if (tn - state1.recent_attempt_time_ < fp_->attempt_interval_) return;
+  if (tn - state1.recent_attempt_time_ < fame_params_->attempt_interval_) return;
 
   int select_id = -1;
   double max_interval = -1.0;
@@ -784,8 +730,8 @@ void FameExplorationFSM::optTimerCallback(const ros::TimerEvent& e) {
     // or the drone just experience another opt
     // or the drone is interacted with recently /* !urgent &&  */
     if (tn - states[i].stamp_ > 0.2) continue;
-    if (tn - states[i].recent_attempt_time_ < fp_->attempt_interval_) continue;
-    if (tn - states[i].recent_interact_time_ < fp_->pair_opt_interval_) continue;
+    if (tn - states[i].recent_attempt_time_ < fame_params_->attempt_interval_) continue;
+    if (tn - states[i].recent_interact_time_ < fame_params_->pair_opt_interval_) continue;
 
     double interval = tn - states[i].recent_interact_time_;
     if (interval <= max_interval) continue;
@@ -819,7 +765,7 @@ void FameExplorationFSM::optTimerCallback(const ros::TimerEvent& e) {
   // for (auto id : ego_ids) opt.ego_ids.push_back(id);
   // for (auto id : other_ids) opt.other_ids.push_back(id);
 
-  for (int i = 0; i < fp_->repeat_send_num_; ++i) opt_pub_.publish(opt);
+  for (int i = 0; i < fame_params_->repeat_send_num_; ++i) opt_pub_.publish(opt);
 
   // ROS_WARN("Drone %d send opt request to %d, pair opt t: %lf, allocate t: %lf", getId(),
   // select_id,
@@ -876,7 +822,7 @@ void FameExplorationFSM::optMsgCallback(const exploration_manager::PairOptConstP
   response.to_drone_id = msg->from_drone_id;
   response.stamp = msg->stamp;  // reply with the same stamp for verificaiton
 
-  if (msg->stamp - state2.recent_attempt_time_ < fp_->attempt_interval_) {
+  if (msg->stamp - state2.recent_attempt_time_ < fame_params_->attempt_interval_) {
     // Just made another pair opt attempt, should reject this attempt to avoid frequent changes
     // ROS_WARN("Reject frequent attempt");
     response.status = 2;
@@ -909,7 +855,7 @@ void FameExplorationFSM::optMsgCallback(const exploration_manager::PairOptConstP
     // } else {
     // }
   }
-  for (int i = 0; i < fp_->repeat_send_num_; ++i) opt_res_pub_.publish(response);
+  for (int i = 0; i < fame_params_->repeat_send_num_; ++i) opt_res_pub_.publish(response);
 }
 
 void FameExplorationFSM::optResMsgCallback(
@@ -966,18 +912,6 @@ void FameExplorationFSM::swarmTrajCallback(const bspline::BsplineConstPtr& msg) 
     pos_pts(i, 2) = msg->pos_pts[i].z;
   }
 
-  // // Transform of drone's basecoor, optional step (skip if use swarm_pilot)
-  // Eigen::Vector4d tf;
-  // planner_manager_->edt_environment_->sdf_map_->getBaseCoor(msg->drone_id, tf);
-  // double yaw = tf[3];
-  // Eigen::Matrix3d rot;
-  // rot << cos(yaw), -sin(yaw), 0, sin(yaw), cos(yaw), 0, 0, 0, 1;
-  // Eigen::Vector3d trans = tf.head<3>();
-  // for (int i = 0; i < pos_pts.rows(); ++i) {
-  //   Eigen::Vector3d tmp = pos_pts.row(i);
-  //   tmp = rot * tmp + trans;
-  //   pos_pts.row(i) = tmp;
-  // }
 
   sdat.swarm_trajs_[msg->drone_id - 1].setUniformBspline(pos_pts, msg->order, 0.1);
   sdat.swarm_trajs_[msg->drone_id - 1].setKnot(knots);
@@ -988,7 +922,7 @@ void FameExplorationFSM::swarmTrajCallback(const bspline::BsplineConstPtr& msg) 
     // Check collision with received trajectory
     if (!planner_manager_->checkSwarmCollision(msg->drone_id)) {
       ROS_ERROR("Drone %d collide with drone %d.", sdat.drone_id_, msg->drone_id);
-      fd_->avoid_collision_ = true;
+      fame_data_->avoid_collision_ = true;
       transitState(PLAN_TRAJ, "swarmTrajCallback");
     }
   }
@@ -997,9 +931,9 @@ void FameExplorationFSM::swarmTrajCallback(const bspline::BsplineConstPtr& msg) 
 void FameExplorationFSM::swarmTrajTimerCallback(const ros::TimerEvent& e) {
   // Broadcast newest traj of this drone to others
   if (state_ == EXEC_TRAJ) {
-    swarm_traj_pub_.publish(fd_->newest_traj_);
+    swarm_traj_pub_.publish(fame_data_->newest_traj_);
 
-  } else if (state_ == WAIT_TRIGGER) {
+  } else if (state_ == INIT) {
     // Publish a virtual traj at current pose, to avoid collision
     bspline::Bspline bspline;
     bspline.order = planner_manager_->pp_.bspline_degree_;
@@ -1007,7 +941,7 @@ void FameExplorationFSM::swarmTrajTimerCallback(const ros::TimerEvent& e) {
     bspline.traj_id = planner_manager_->local_data_.traj_id_;
 
     Eigen::MatrixXd pos_pts(4, 3);
-    for (int i = 0; i < 4; ++i) pos_pts.row(i) = fd_->odom_pos_.transpose();
+    for (int i = 0; i < 4; ++i) pos_pts.row(i) = fame_data_->odom_pos_.transpose();
 
     for (int i = 0; i < pos_pts.rows(); ++i) {
       geometry_msgs::Point pt;

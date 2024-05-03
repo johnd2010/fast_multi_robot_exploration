@@ -75,6 +75,7 @@ public:
 
   bool isPositionReachable(const Vector3d& from, const Vector3d& to) const;
 
+
   int planTrajToView(const Vector3d& pos, const Vector3d& vel, const Vector3d& acc,
       const Vector3d& yaw, const Vector3d& next_pos, const double& next_yaw);
 

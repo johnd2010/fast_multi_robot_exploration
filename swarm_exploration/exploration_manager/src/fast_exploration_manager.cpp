@@ -3,19 +3,15 @@
 #include <thread>
 #include <iostream>
 #include <fstream>
-#include <boost/filesystem.hpp>
 #include <active_perception/graph_node.h>
 #include <active_perception/graph_search.h>
 #include <active_perception/perception_utils.h>
 #include <active_perception/frontier_finder.h>
-// #include <active_perception/uniform_grid.h>
 #include <active_perception/hgrid.h>
 #include <plan_env/raycast.h>
 #include <plan_env/sdf_map.h>
 #include <plan_env/edt_environment.h>
 #include <plan_manage/planner_manager.h>
-// #include <lkh_tsp_solver/lkh_interface.h>
-// #include <lkh_mtsp_solver/lkh3_interface.h>
 #include <lkh_tsp_solver/SolveTSP.h>
 #include <lkh_mtsp_solver/SolveMTSP.h>
 
@@ -50,30 +46,30 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   hgrid_.reset(new HGrid(edt_environment_, nh));
   // view_finder_.reset(new ViewFinder(edt_environment_, nh));
 
-  ed_.reset(new ExplorationData);
-  ep_.reset(new ExplorationParam);
+  exploration_data_.reset(new ExplorationData);
+  exploration_param_.reset(new ExplorationParam);
 
-  nh.param("exploration/refine_local", ep_->refine_local_, true);
-  nh.param("exploration/refined_num", ep_->refined_num_, -1);
-  nh.param("exploration/refined_radius", ep_->refined_radius_, -1.0);
-  nh.param("exploration/top_view_num", ep_->top_view_num_, -1);
-  nh.param("exploration/max_decay", ep_->max_decay_, -1.0);
-  nh.param("exploration/tsp_dir", ep_->tsp_dir_, string("null"));
-  nh.param("exploration/mtsp_dir", ep_->mtsp_dir_, string("null"));
-  nh.param("exploration/relax_time", ep_->relax_time_, 1.0);
-  nh.param("exploration/drone_num", ep_->drone_num_, 1);
-  nh.param("exploration/drone_id", ep_->drone_id_, 1);
-  nh.param("exploration/init_plan_num", ep_->init_plan_num_, 2);
+  nh.param("exploration/refine_local", exploration_param_->refine_local_, true);
+  nh.param("exploration/refined_num", exploration_param_->refined_num_, -1);
+  nh.param("exploration/refined_radius", exploration_param_->refined_radius_, -1.0);
+  nh.param("exploration/top_view_num", exploration_param_->top_view_num_, -1);
+  nh.param("exploration/max_decay", exploration_param_->max_decay_, -1.0);
+  nh.param("exploration/tsp_dir", exploration_param_->tsp_dir_, string("null"));
+  nh.param("exploration/mtsp_dir", exploration_param_->mtsp_dir_, string("null"));
+  nh.param("exploration/relax_time", exploration_param_->relax_time_, 1.0);
+  nh.param("exploration/drone_num", exploration_param_->drone_num_, 1);
+  nh.param("exploration/drone_id", exploration_param_->drone_id_, 1);
+  nh.param("exploration/init_plan_num", exploration_param_->init_plan_num_, 2);
 
-  ed_->swarm_state_.resize(ep_->drone_num_);
-  ed_->pair_opt_stamps_.resize(ep_->drone_num_);
-  ed_->pair_opt_res_stamps_.resize(ep_->drone_num_);
-  for (int i = 0; i < ep_->drone_num_; ++i) {
-    ed_->swarm_state_[i].stamp_ = 0.0;
-    ed_->pair_opt_stamps_[i] = 0.0;
-    ed_->pair_opt_res_stamps_[i] = 0.0;
+  exploration_data_->swarm_state_.resize(exploration_param_->drone_num_);
+  exploration_data_->pair_opt_stamps_.resize(exploration_param_->drone_num_);
+  exploration_data_->pair_opt_res_stamps_.resize(exploration_param_->drone_num_);
+  for (int i = 0; i < exploration_param_->drone_num_; ++i) {
+    exploration_data_->swarm_state_[i].stamp_ = 0.0;
+    exploration_data_->pair_opt_stamps_[i] = 0.0;
+    exploration_data_->pair_opt_res_stamps_[i] = 0.0;
   }
-  planner_manager_->swarm_traj_data_.init(ep_->drone_id_, ep_->drone_num_);
+  planner_manager_->swarm_traj_data_.init(exploration_param_->drone_id_, exploration_param_->drone_num_);
 
   nh.param("exploration/vm", ViewNode::vm_, -1.0);
   nh.param("exploration/am", ViewNode::am_, -1.0);
@@ -96,21 +92,21 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   planner_manager_->path_finder_->max_search_time_ = 1.0;
 
   tsp_client_ =
-      nh.serviceClient<lkh_mtsp_solver::SolveMTSP>("/solve_tsp_" + to_string(ep_->drone_id_), true);
+      nh.serviceClient<lkh_mtsp_solver::SolveMTSP>("/solve_tsp_" + to_string(exploration_param_->drone_id_), true);
   acvrp_client_ = nh.serviceClient<lkh_mtsp_solver::SolveMTSP>(
-      "/solve_acvrp_" + to_string(ep_->drone_id_), true);
+      "/solve_acvrp_" + to_string(exploration_param_->drone_id_), true);
 
   // Swarm
-  for (auto& state : ed_->swarm_state_) {
+  for (auto& state : exploration_data_->swarm_state_) {
     state.stamp_ = 0.0;
     state.recent_interact_time_ = 0.0;
     state.recent_attempt_time_ = 0.0;
   }
-  ed_->last_grid_ids_ = {};
-  ed_->reallocated_ = true;
-  ed_->pair_opt_stamp_ = 0.0;
-  ed_->wait_response_ = false;
-  ed_->plan_num_ = 0;
+  exploration_data_->last_grid_ids_ = {};
+  exploration_data_->reallocated_ = true;
+  exploration_data_->pair_opt_stamp_ = 0.0;
+  exploration_data_->wait_response_ = false;
+  exploration_data_->plan_num_ = 0;
 
   // Analysis
   // ofstream fout;
@@ -130,7 +126,7 @@ int FastExplorationManager::planExploreMotion(
 
   auto start_time = chrono::high_resolution_clock::now();
 
-  ed_->frontier_tour_.clear();
+  exploration_data_->frontier_tour_.clear();
   Vector3d next_pos;
   double next_yaw;
   // Find the tour passing through viewpoints
@@ -138,6 +134,7 @@ int FastExplorationManager::planExploreMotion(
   vector<int> grid_ids, frontier_ids;
   // findGlobalTour(pos, vel, yaw, indices);
   findGridAndFrontierPath(pos, vel, yaw, grid_ids, frontier_ids);
+  ROS_WARN("Hello");
 
   if (grid_ids.empty()) {
 
@@ -150,37 +147,38 @@ int FastExplorationManager::planExploreMotion(
     double min_cost = 100000;
     int min_cost_id = -1;
     vector<Vector3d> tmp_path;
-    for (int i = 0; i < ed_->averages_.size(); ++i) {
+    for (int i = 0; i < exploration_data_->averages_.size(); ++i) {
       auto tmp_cost =
-          ViewNode::computeCost(pos, ed_->points_[i], yaw[0], ed_->yaws_[i], vel, yaw[1], tmp_path);
+          ViewNode::computeCost(pos, exploration_data_->points_[i], yaw[0], exploration_data_->yaws_[i], vel, yaw[1], tmp_path);
       if (tmp_cost < min_cost) {
         min_cost = tmp_cost;
         min_cost_id = i;
       }
     }
-    next_pos = ed_->points_[min_cost_id];
-    next_yaw = ed_->yaws_[min_cost_id];
+    next_pos = exploration_data_->points_[min_cost_id];
+    next_yaw = exploration_data_->yaws_[min_cost_id];
+    
 
   } else if (frontier_ids.size() == 0) {
     // // The assigned grid contains no frontier, find the one closest to the grid
     // ROS_WARN("No frontier in grid");
 
-    Eigen::Vector3d grid_center = ed_->grid_tour_[1];
+    Eigen::Vector3d grid_center = exploration_data_->grid_tour_[1];
 
     double min_cost = 100000;
     int min_cost_id = -1;
-    for (int i = 0; i < ed_->points_.size(); ++i) {
-      // double cost = (grid_center - ed_->averages_[i]).norm();
+    for (int i = 0; i < exploration_data_->points_.size(); ++i) {
+      // double cost = (grid_center - exploration_data_->averages_[i]).norm();
       vector<Eigen::Vector3d> path;
       double cost = ViewNode::computeCost(
-          grid_center, ed_->averages_[i], 0, 0, Eigen::Vector3d(0, 0, 0), 0, path);
+          grid_center, exploration_data_->averages_[i], 0, 0, Eigen::Vector3d(0, 0, 0), 0, path);
       if (cost < min_cost) {
         min_cost = cost;
         min_cost_id = i;
       }
     }
-    next_pos = ed_->points_[min_cost_id];
-    next_yaw = ed_->yaws_[min_cost_id];
+    next_pos = exploration_data_->points_[min_cost_id];
+    next_yaw = exploration_data_->yaws_[min_cost_id];
 
     // // Simply go to the center of the unknown grid
     // next_pos = grid_center;
@@ -189,52 +187,52 @@ int FastExplorationManager::planExploreMotion(
 
   } else if (frontier_ids.size() == 1) {
     // ROS_WARN("Single frontier");
-    if (ep_->refine_local_) {
+    if (exploration_param_->refine_local_) {
       // Single frontier, find the min cost viewpoint for it
-      ed_->refined_ids_ = { frontier_ids[0] };
-      ed_->unrefined_points_ = { ed_->points_[frontier_ids[0]] };
-      ed_->n_points_.clear();
+      exploration_data_->refined_ids_ = { frontier_ids[0] };
+      exploration_data_->unrefined_points_ = { exploration_data_->points_[frontier_ids[0]] };
+      exploration_data_->n_points_.clear();
       vector<vector<double>> n_yaws;
       frontier_finder_->getViewpointsInfo(
-          pos, { frontier_ids[0] }, ep_->top_view_num_, ep_->max_decay_, ed_->n_points_, n_yaws);
+          pos, { frontier_ids[0] }, exploration_param_->top_view_num_, exploration_param_->max_decay_, exploration_data_->n_points_, n_yaws);
 
       if (grid_ids.size() <= 1) {
         // Only one grid is assigned
         double min_cost = 100000;
         int min_cost_id = -1;
         vector<Vector3d> tmp_path;
-        for (int i = 0; i < ed_->n_points_[0].size(); ++i) {
+        for (int i = 0; i < exploration_data_->n_points_[0].size(); ++i) {
           auto tmp_cost = ViewNode::computeCost(
-              pos, ed_->n_points_[0][i], yaw[0], n_yaws[0][i], vel, yaw[1], tmp_path);
+              pos, exploration_data_->n_points_[0][i], yaw[0], n_yaws[0][i], vel, yaw[1], tmp_path);
           if (tmp_cost < min_cost) {
             min_cost = tmp_cost;
             min_cost_id = i;
           }
         }
-        next_pos = ed_->n_points_[0][min_cost_id];
+        next_pos = exploration_data_->n_points_[0][min_cost_id];
         next_yaw = n_yaws[0][min_cost_id];
       } else {
         // More than one grid, the next grid is considered for path planning
-        // vector<Eigen::Vector3d> grid_pos = { ed_->grid_tour_[2] };
-        // Eigen::Vector3d dir = ed_->grid_tour_[2] - ed_->grid_tour_[1];
+        // vector<Eigen::Vector3d> grid_pos = { exploration_data_->grid_tour_[2] };
+        // Eigen::Vector3d dir = exploration_data_->grid_tour_[2] - exploration_data_->grid_tour_[1];
         // vector<double> grid_yaw = { atan2(dir[1], dir[0]) };
 
         Eigen::Vector3d grid_pos;
         double grid_yaw;
         if (hgrid_->getNextGrid(grid_ids, grid_pos, grid_yaw)) {
-          ed_->n_points_.push_back({ grid_pos });
+          exploration_data_->n_points_.push_back({ grid_pos });
           n_yaws.push_back({ grid_yaw });
         }
 
-        ed_->refined_points_.clear();
-        ed_->refined_views_.clear();
+        exploration_data_->refined_points_.clear();
+        exploration_data_->refined_views_.clear();
         vector<double> refined_yaws;
-        refineLocalTour(pos, vel, yaw, ed_->n_points_, n_yaws, ed_->refined_points_, refined_yaws);
-        next_pos = ed_->refined_points_[0];
+        refineLocalTour(pos, vel, yaw, exploration_data_->n_points_, n_yaws, exploration_data_->refined_points_, refined_yaws);
+        next_pos = exploration_data_->refined_points_[0];
         next_yaw = refined_yaws[0];
       }
-      ed_->refined_points_ = { next_pos };
-      ed_->refined_views_ = { next_pos + 2.0 * Vector3d(cos(next_yaw), sin(next_yaw), 0) };
+      exploration_data_->refined_points_ = { next_pos };
+      exploration_data_->refined_views_ = { next_pos + 2.0 * Vector3d(cos(next_yaw), sin(next_yaw), 0) };
     }
   } else {
     // ROS_WARN("Multiple frontier");
@@ -242,51 +240,53 @@ int FastExplorationManager::planExploreMotion(
     // Do refinement for the next few viewpoints in the global tour
     t1 = ros::Time::now();
 
-    ed_->refined_ids_.clear();
-    ed_->unrefined_points_.clear();
-    int knum = min(int(frontier_ids.size()), ep_->refined_num_);
+    exploration_data_->refined_ids_.clear();
+    exploration_data_->unrefined_points_.clear();
+    int knum = min(int(frontier_ids.size()), exploration_param_->refined_num_);
     for (int i = 0; i < knum; ++i) {
-      auto tmp = ed_->points_[frontier_ids[i]];
-      ed_->unrefined_points_.push_back(tmp);
-      ed_->refined_ids_.push_back(frontier_ids[i]);
-      if ((tmp - pos).norm() > ep_->refined_radius_ && ed_->refined_ids_.size() >= 2) break;
+      auto tmp = exploration_data_->points_[frontier_ids[i]];
+      exploration_data_->unrefined_points_.push_back(tmp);
+      exploration_data_->refined_ids_.push_back(frontier_ids[i]);
+      if ((tmp - pos).norm() > exploration_param_->refined_radius_ && exploration_data_->refined_ids_.size() >= 2) break;
     }
 
     // Get top N viewpoints for the next K frontiers
-    ed_->n_points_.clear();
+    exploration_data_->n_points_.clear();
     vector<vector<double>> n_yaws;
     frontier_finder_->getViewpointsInfo(
-        pos, ed_->refined_ids_, ep_->top_view_num_, ep_->max_decay_, ed_->n_points_, n_yaws);
+        pos, exploration_data_->refined_ids_, exploration_param_->top_view_num_, exploration_param_->max_decay_, exploration_data_->n_points_, n_yaws);
 
-    ed_->refined_points_.clear();
-    ed_->refined_views_.clear();
+    exploration_data_->refined_points_.clear();
+    exploration_data_->refined_views_.clear();
     vector<double> refined_yaws;
-    refineLocalTour(pos, vel, yaw, ed_->n_points_, n_yaws, ed_->refined_points_, refined_yaws);
-    next_pos = ed_->refined_points_[0];
+    refineLocalTour(pos, vel, yaw, exploration_data_->n_points_, n_yaws, exploration_data_->refined_points_, refined_yaws);
+    next_pos = exploration_data_->refined_points_[0];
     next_yaw = refined_yaws[0];
 
     // Get marker for view visualization
-    for (int i = 0; i < ed_->refined_points_.size(); ++i) {
+    for (int i = 0; i < exploration_data_->refined_points_.size(); ++i) {
       Vector3d view =
-          ed_->refined_points_[i] + 2.0 * Vector3d(cos(refined_yaws[i]), sin(refined_yaws[i]), 0);
-      ed_->refined_views_.push_back(view);
+          exploration_data_->refined_points_[i] + 2.0 * Vector3d(cos(refined_yaws[i]), sin(refined_yaws[i]), 0);
+      exploration_data_->refined_views_.push_back(view);
     }
-    ed_->refined_views1_.clear();
-    ed_->refined_views2_.clear();
-    for (int i = 0; i < ed_->refined_points_.size(); ++i) {
+    exploration_data_->refined_views1_.clear();
+    exploration_data_->refined_views2_.clear();
+    for (int i = 0; i < exploration_data_->refined_points_.size(); ++i) {
       vector<Vector3d> v1, v2;
-      frontier_finder_->percep_utils_->setPose(ed_->refined_points_[i], refined_yaws[i]);
+      frontier_finder_->percep_utils_->setPose(exploration_data_->refined_points_[i], refined_yaws[i]);
       frontier_finder_->percep_utils_->getFOV(v1, v2);
-      ed_->refined_views1_.insert(ed_->refined_views1_.end(), v1.begin(), v1.end());
-      ed_->refined_views2_.insert(ed_->refined_views2_.end(), v2.begin(), v2.end());
+      exploration_data_->refined_views1_.insert(exploration_data_->refined_views1_.end(), v1.begin(), v1.end());
+      exploration_data_->refined_views2_.insert(exploration_data_->refined_views2_.end(), v2.begin(), v2.end());
     }
     double local_time = (ros::Time::now() - t1).toSec();
     ROS_INFO("Local refine time: %lf", local_time);
   }
 
   std::cout << "Next view: " << next_pos.transpose() << ", " << next_yaw << std::endl;
-  ed_->next_pos_ = next_pos;
-  ed_->next_yaw_ = next_yaw;
+  exploration_data_->next_pos_ = next_pos;
+  exploration_data_->next_yaw_ = next_yaw;
+  ROS_WARN("%f %f %f %f",next_pos(0),next_pos(1),next_pos(2),next_yaw);
+  ROS_WARN("Hello");
 
   if (planTrajToView(pos, vel, acc, yaw, next_pos, next_yaw) == FAIL) {
     return FAIL;
@@ -313,27 +313,27 @@ int FastExplorationManager::planTrajToView(const Vector3d& pos, const Vector3d& 
   // Generate trajectory of x,y,z
   bool goal_unknown = (edt_environment_->sdf_map_->getOccupancy(next_pos) == SDFMap::UNKNOWN);
   // bool start_unknown = (edt_environment_->sdf_map_->getOccupancy(pos) == SDFMap::UNKNOWN);
-  bool optimistic = ed_->plan_num_ < ep_->init_plan_num_;
+  bool optimistic = exploration_data_->plan_num_ < exploration_param_->init_plan_num_;
   planner_manager_->path_finder_->reset();
   if (planner_manager_->path_finder_->search(pos, next_pos, optimistic) != Astar::REACH_END) {
     ROS_ERROR("No path to next viewpoint");
     return FAIL;
   }
-  ed_->path_next_goal_ = planner_manager_->path_finder_->getPath();
-  shortenPath(ed_->path_next_goal_);
-  ed_->kino_path_.clear();
+  exploration_data_->path_next_goal_ = planner_manager_->path_finder_->getPath();
+  shortenPath(exploration_data_->path_next_goal_);
+  exploration_data_->kino_path_.clear();
 
   const double radius_far = 7.0;
   const double radius_close = 1.5;
-  const double len = Astar::pathLength(ed_->path_next_goal_);
+  const double len = Astar::pathLength(exploration_data_->path_next_goal_);
   if (len < radius_close || optimistic) {
     // Next viewpoint is very close, no need to search kinodynamic path, just use waypoints-based
     // optimization
-    planner_manager_->planExploreTraj(ed_->path_next_goal_, vel, acc, time_lb);
-    ed_->next_goal_ = next_pos;
+    planner_manager_->planExploreTraj(exploration_data_->path_next_goal_, vel, acc, time_lb);
+    exploration_data_->next_goal_ = next_pos;
     // std::cout << "Close goal." << std::endl;
-    if (ed_->plan_num_ < ep_->init_plan_num_) {
-      ed_->plan_num_++;
+    if (exploration_data_->plan_num_ < exploration_param_->init_plan_num_) {
+      exploration_data_->plan_num_++;
       ROS_WARN("init plan.");
     }
   } else if (len > radius_far) {
@@ -341,23 +341,23 @@ int FastExplorationManager::planTrajToView(const Vector3d& pos, const Vector3d& 
     // dead end)
     std::cout << "Far goal." << std::endl;
     double len2 = 0.0;
-    vector<Eigen::Vector3d> truncated_path = { ed_->path_next_goal_.front() };
-    for (int i = 1; i < ed_->path_next_goal_.size() && len2 < radius_far; ++i) {
-      auto cur_pt = ed_->path_next_goal_[i];
+    vector<Eigen::Vector3d> truncated_path = { exploration_data_->path_next_goal_.front() };
+    for (int i = 1; i < exploration_data_->path_next_goal_.size() && len2 < radius_far; ++i) {
+      auto cur_pt = exploration_data_->path_next_goal_[i];
       len2 += (cur_pt - truncated_path.back()).norm();
       truncated_path.push_back(cur_pt);
     }
-    ed_->next_goal_ = truncated_path.back();
+    exploration_data_->next_goal_ = truncated_path.back();
     planner_manager_->planExploreTraj(truncated_path, vel, acc, time_lb);
   } else {
     // Search kino path to exactly next viewpoint and optimize
     std::cout << "Mid goal" << std::endl;
-    ed_->next_goal_ = next_pos;
+    exploration_data_->next_goal_ = next_pos;
 
     if (!planner_manager_->kinodynamicReplan(
-            pos, vel, acc, ed_->next_goal_, Vector3d(0, 0, 0), time_lb))
+            pos, vel, acc, exploration_data_->next_goal_, Vector3d(0, 0, 0), time_lb))
       return FAIL;
-    ed_->kino_path_ = planner_manager_->kino_path_finder_->getKinoTraj(0.02);
+    exploration_data_->kino_path_ = planner_manager_->kino_path_finder_->getKinoTraj(0.02);
   }
 
   if (planner_manager_->local_data_.position_traj_.getTimeSum() < time_lb - 0.5)
@@ -366,7 +366,7 @@ int FastExplorationManager::planTrajToView(const Vector3d& pos, const Vector3d& 
   double traj_plan_time = (ros::Time::now() - t1).toSec();
 
   t1 = ros::Time::now();
-  planner_manager_->planYawExplore(yaw, next_yaw, true, ep_->relax_time_);
+  planner_manager_->planYawExplore(yaw, next_yaw, true, exploration_param_->relax_time_);
   double yaw_time = (ros::Time::now() - t1).toSec();
   ROS_INFO("Traj: %lf, yaw: %lf", traj_plan_time, yaw_time);
 
@@ -377,7 +377,7 @@ int FastExplorationManager::updateFrontierStruct(const Eigen::Vector3d& pos) {
 
   auto t1 = ros::Time::now();
   auto t2 = t1;
-  ed_->views_.clear();
+  exploration_data_->views_.clear();
 
   // Search frontiers and group them into clusters
   frontier_finder_->searchFrontiers();
@@ -389,16 +389,16 @@ int FastExplorationManager::updateFrontierStruct(const Eigen::Vector3d& pos) {
   frontier_finder_->computeFrontiersToVisit();
 
   // Retrieve the updated info
-  frontier_finder_->getFrontiers(ed_->frontiers_);
-  frontier_finder_->getDormantFrontiers(ed_->dead_frontiers_);
-  frontier_finder_->getFrontierBoxes(ed_->frontier_boxes_);
+  frontier_finder_->getFrontiers(exploration_data_->frontiers_);
+  frontier_finder_->getDormantFrontiers(exploration_data_->dead_frontiers_);
+  frontier_finder_->getFrontierBoxes(exploration_data_->frontier_boxes_);
 
-  frontier_finder_->getTopViewpointsInfo(pos, ed_->points_, ed_->yaws_, ed_->averages_);
-  for (int i = 0; i < ed_->points_.size(); ++i)
-    ed_->views_.push_back(
-        ed_->points_[i] + 2.0 * Vector3d(cos(ed_->yaws_[i]), sin(ed_->yaws_[i]), 0));
+  frontier_finder_->getTopViewpointsInfo(pos, exploration_data_->points_, exploration_data_->yaws_, exploration_data_->averages_);
+  for (int i = 0; i < exploration_data_->points_.size(); ++i)
+    exploration_data_->views_.push_back(
+        exploration_data_->points_[i] + 2.0 * Vector3d(cos(exploration_data_->yaws_[i]), sin(exploration_data_->yaws_[i]), 0));
 
-  if (ed_->frontiers_.empty()) {
+  if (exploration_data_->frontiers_.empty()) {
     ROS_WARN("No coverable frontier.");
     return 0;
   }
@@ -410,11 +410,11 @@ int FastExplorationManager::updateFrontierStruct(const Eigen::Vector3d& pos) {
 
   double mat_time = (ros::Time::now() - t1).toSec();
   double total_time = frontier_time + view_time + mat_time;
-  ROS_INFO("Drone %d: frontier t: %lf, viewpoint t: %lf, mat: %lf", ep_->drone_id_, frontier_time,
+  ROS_INFO("Drone %d: frontier t: %lf, viewpoint t: %lf, mat: %lf", exploration_param_->drone_id_, frontier_time,
       view_time, mat_time);
 
   ROS_INFO("Total t: %lf", (ros::Time::now() - t2).toSec());
-  return ed_->frontiers_.size();
+  return exploration_data_->frontiers_.size();
 }
 
 void FastExplorationManager::findGridAndFrontierPath(const Vector3d& cur_pos,
@@ -512,18 +512,18 @@ void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vecto
   t1 = ros::Time::now();
 
   // Initialize TSP par file
-  ofstream par_file(ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".par");
-  par_file << "PROBLEM_FILE = " << ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".tsp\n";
+  ofstream par_file(exploration_param_->tsp_dir_ + "/drone_" + to_string(exploration_param_->drone_id_) + ".par");
+  par_file << "PROBLEM_FILE = " << exploration_param_->tsp_dir_ + "/drone_" + to_string(exploration_param_->drone_id_) + ".tsp\n";
   par_file << "GAIN23 = NO\n";
   par_file << "OUTPUT_TOUR_FILE ="
-           << ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) +
+           << exploration_param_->tsp_dir_ + "/drone_" + to_string(exploration_param_->drone_id_) +
                   ".tou"
                   "r\n";
   par_file << "RUNS = 1\n";
   par_file.close();
 
   // Write params and cost matrix to problem file
-  ofstream prob_file(ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".tsp");
+  ofstream prob_file(exploration_param_->tsp_dir_ + "/drone_" + to_string(exploration_param_->drone_id_) + ".tsp");
   // Problem specification part, follow the format of TSPLIB
   string prob_spec;
   prob_spec = "NAME : single\nTYPE : ATSP\nDIMENSION : " + to_string(dimension) +
@@ -544,7 +544,7 @@ void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vecto
   prob_file << "EOF";
   prob_file.close();
 
-  // solveTSPLKH((ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".par").c_str());
+  // solveTSPLKH((exploration_param_->tsp_dir_ + "/drone_" + to_string(exploration_param_->drone_id_) + ".par").c_str());
   lkh_tsp_solver::SolveTSP srv;
   if (!tsp_client_.call(srv)) {
     ROS_ERROR("Fail to solve TSP.");
@@ -552,7 +552,7 @@ void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vecto
   }
 
   // Read optimal tour from the tour section of result file
-  ifstream res_file(ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".tour");
+  ifstream res_file(exploration_param_->tsp_dir_ + "/drone_" + to_string(exploration_param_->drone_id_) + ".tour");
   string res;
   while (getline(res_file, res)) {
     // Go to tour section
@@ -571,12 +571,12 @@ void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vecto
 
   res_file.close();
 
-  std::cout << "Tour " << ep_->drone_id_ << ": ";
+  std::cout << "Tour " << exploration_param_->drone_id_ << ": ";
   for (auto id : indices) std::cout << id << ", ";
   std::cout << "" << std::endl;
 
   // Get the path of optimal tour from path matrix
-  frontier_finder_->getPathForTour(cur_pos, indices, ed_->frontier_tour_);
+  frontier_finder_->getPathForTour(cur_pos, indices, exploration_data_->frontier_tour_);
 
   double tsp_time = (ros::Time::now() - t1).toSec();
   ROS_INFO("Cost mat: %lf, TSP: %lf", mat_time, tsp_time);
@@ -642,16 +642,16 @@ void FastExplorationManager::refineLocalTour(const Vector3d& cur_pos, const Vect
   }
 
   // Extract optimal local tour (for visualization)
-  ed_->refined_tour_.clear();
-  ed_->refined_tour_.push_back(cur_pos);
+  exploration_data_->refined_tour_.clear();
+  exploration_data_->refined_tour_.push_back(cur_pos);
   ViewNode::astar_->lambda_heu_ = 1.0;
   ViewNode::astar_->setResolution(0.2);
   for (auto pt : refined_pts) {
     vector<Vector3d> path;
-    if (ViewNode::searchPath(ed_->refined_tour_.back(), pt, path))
-      ed_->refined_tour_.insert(ed_->refined_tour_.end(), path.begin(), path.end());
+    if (ViewNode::searchPath(exploration_data_->refined_tour_.back(), pt, path))
+      exploration_data_->refined_tour_.insert(exploration_data_->refined_tour_.end(), path.begin(), path.end());
     else
-      ed_->refined_tour_.push_back(pt);
+      exploration_data_->refined_tour_.push_back(pt);
   }
   ViewNode::astar_->lambda_heu_ = 10000;
 
@@ -719,7 +719,7 @@ void FastExplorationManager::allocateGrids(const vector<Eigen::Vector3d>& positi
   const int prob_type = 2;
 
   // Create problem file--------------------------
-  ofstream file(ep_->mtsp_dir_ + "/amtsp3_" + to_string(ep_->drone_id_) + ".atsp");
+  ofstream file(exploration_param_->mtsp_dir_ + "/amtsp3_" + to_string(exploration_param_->drone_id_) + ".atsp");
   file << "NAME : pairopt\n";
 
   if (prob_type == 1)
@@ -766,9 +766,9 @@ void FastExplorationManager::allocateGrids(const vector<Eigen::Vector3d>& positi
   // Create par file------------------------------------------
   int min_size = int(grid_ids.size()) / 2;
   int max_size = ceil(int(grid_ids.size()) / 2.0);
-  file.open(ep_->mtsp_dir_ + "/amtsp3_" + to_string(ep_->drone_id_) + ".par");
+  file.open(exploration_param_->mtsp_dir_ + "/amtsp3_" + to_string(exploration_param_->drone_id_) + ".par");
   file << "SPECIAL\n";
-  file << "PROBLEM_FILE = " + ep_->mtsp_dir_ + "/amtsp3_" + to_string(ep_->drone_id_) + ".atsp\n";
+  file << "PROBLEM_FILE = " + exploration_param_->mtsp_dir_ + "/amtsp3_" + to_string(exploration_param_->drone_id_) + ".atsp\n";
   if (prob_type == 1) {
     file << "SALESMEN = " << to_string(drone_num) << "\n";
     file << "MTSP_OBJECTIVE = MINSUM\n";
@@ -781,11 +781,11 @@ void FastExplorationManager::allocateGrids(const vector<Eigen::Vector3d>& positi
     file << "SEED = 0\n";         // ACVRP
   }
   file << "RUNS = 1\n";
-  file << "TOUR_FILE = " + ep_->mtsp_dir_ + "/amtsp3_" + to_string(ep_->drone_id_) + ".tour\n";
+  file << "TOUR_FILE = " + exploration_param_->mtsp_dir_ + "/amtsp3_" + to_string(exploration_param_->drone_id_) + ".tour\n";
 
   file.close();
 
-  auto par_dir = ep_->mtsp_dir_ + "/amtsp3_" + to_string(ep_->drone_id_) + ".atsp";
+  auto par_dir = exploration_param_->mtsp_dir_ + "/amtsp3_" + to_string(exploration_param_->drone_id_) + ".atsp";
   t1 = ros::Time::now();
 
   lkh_mtsp_solver::SolveMTSP srv;
@@ -804,7 +804,7 @@ void FastExplorationManager::allocateGrids(const vector<Eigen::Vector3d>& positi
   // Read results
   t1 = ros::Time::now();
 
-  ifstream fin(ep_->mtsp_dir_ + "/amtsp3_" + to_string(ep_->drone_id_) + ".tour");
+  ifstream fin(exploration_param_->mtsp_dir_ + "/amtsp3_" + to_string(exploration_param_->drone_id_) + ".tour");
   string res;
   vector<int> ids;
   while (getline(fin, res)) {
@@ -886,19 +886,19 @@ bool FastExplorationManager::findGlobalTourOfGrid(const vector<Eigen::Vector3d>&
 
   auto t1 = ros::Time::now();
 
-  auto& grid_ids = ed_->swarm_state_[ep_->drone_id_ - 1].grid_ids_;
+  auto& grid_ids = exploration_data_->swarm_state_[exploration_param_->drone_id_ - 1].grid_ids_;
 
   // hgrid_->updateBaseCoor();  // Use the latest basecoor transform of swarm
 
   vector<int> first_ids, second_ids;
-  hgrid_->inputFrontiers(ed_->averages_);
+  hgrid_->inputFrontiers(exploration_data_->averages_);
 
   hgrid_->updateGridData(
-      ep_->drone_id_, grid_ids, ed_->reallocated_, ed_->last_grid_ids_, first_ids, second_ids);
+      exploration_param_->drone_id_, grid_ids, exploration_data_->reallocated_, exploration_data_->last_grid_ids_, first_ids, second_ids);
 
   if (grid_ids.empty()) {
     ROS_WARN("Empty dominance.");
-    ed_->grid_tour_.clear();
+    exploration_data_->grid_tour_.clear();
     return false;
   }
 
@@ -921,7 +921,7 @@ bool FastExplorationManager::findGlobalTourOfGrid(const vector<Eigen::Vector3d>&
   const int drone_num = 1;
 
   // Create problem file
-  ofstream file(ep_->mtsp_dir_ + "/amtsp2_" + to_string(ep_->drone_id_) + ".atsp");
+  ofstream file(exploration_param_->mtsp_dir_ + "/amtsp2_" + to_string(exploration_param_->drone_id_) + ".atsp");
   file << "NAME : amtsp\n";
   file << "TYPE : ATSP\n";
   file << "DIMENSION : " + to_string(dimension) + "\n";
@@ -938,20 +938,20 @@ bool FastExplorationManager::findGlobalTourOfGrid(const vector<Eigen::Vector3d>&
   file.close();
 
   // Create par file
-  file.open(ep_->mtsp_dir_ + "/amtsp2_" + to_string(ep_->drone_id_) + ".par");
+  file.open(exploration_param_->mtsp_dir_ + "/amtsp2_" + to_string(exploration_param_->drone_id_) + ".par");
   file << "SPECIAL\n";
-  file << "PROBLEM_FILE = " + ep_->mtsp_dir_ + "/amtsp2_" + to_string(ep_->drone_id_) + ".atsp\n";
+  file << "PROBLEM_FILE = " + exploration_param_->mtsp_dir_ + "/amtsp2_" + to_string(exploration_param_->drone_id_) + ".atsp\n";
   file << "SALESMEN = " << to_string(drone_num) << "\n";
   file << "MTSP_OBJECTIVE = MINSUM\n";
-  // file << "MTSP_MIN_SIZE = " << to_string(min(int(ed_->frontiers_.size()) / drone_num, 4)) <<
+  // file << "MTSP_MIN_SIZE = " << to_string(min(int(exploration_data_->frontiers_.size()) / drone_num, 4)) <<
   // "\n"; file << "MTSP_MAX_SIZE = "
-  //      << to_string(max(1, int(ed_->frontiers_.size()) / max(1, drone_num - 1))) << "\n";
+  //      << to_string(max(1, int(exploration_data_->frontiers_.size()) / max(1, drone_num - 1))) << "\n";
   file << "RUNS = 1\n";
   file << "TRACE_LEVEL = 0\n";
-  file << "TOUR_FILE = " + ep_->mtsp_dir_ + "/amtsp2_" + to_string(ep_->drone_id_) + ".tour\n";
+  file << "TOUR_FILE = " + exploration_param_->mtsp_dir_ + "/amtsp2_" + to_string(exploration_param_->drone_id_) + ".tour\n";
   file.close();
 
-  auto par_dir = ep_->mtsp_dir_ + "/amtsp2_" + to_string(ep_->drone_id_) + ".atsp";
+  auto par_dir = exploration_param_->mtsp_dir_ + "/amtsp2_" + to_string(exploration_param_->drone_id_) + ".atsp";
   t1 = ros::Time::now();
 
   lkh_mtsp_solver::SolveMTSP srv;
@@ -967,7 +967,7 @@ bool FastExplorationManager::findGlobalTourOfGrid(const vector<Eigen::Vector3d>&
   // Read results
   t1 = ros::Time::now();
 
-  ifstream fin(ep_->mtsp_dir_ + "/amtsp2_" + to_string(ep_->drone_id_) + ".tour");
+  ifstream fin(exploration_param_->mtsp_dir_ + "/amtsp2_" + to_string(exploration_param_->drone_id_) + ".tour");
   string res;
   vector<int> ids;
   while (getline(fin, res)) {
@@ -1021,12 +1021,12 @@ bool FastExplorationManager::findGlobalTourOfGrid(const vector<Eigen::Vector3d>&
   }
   std::cout << "" << std::endl;
 
-  // uniform_grid_->getGridTour(indices, ed_->grid_tour_);
+  // uniform_grid_->getGridTour(indices, exploration_data_->grid_tour_);
   grid_ids = indices;
-  hgrid_->getGridTour(grid_ids, positions[0], ed_->grid_tour_, ed_->grid_tour2_);
+  hgrid_->getGridTour(grid_ids, positions[0], exploration_data_->grid_tour_, exploration_data_->grid_tour2_);
 
-  ed_->last_grid_ids_ = grid_ids;
-  ed_->reallocated_ = false;
+  exploration_data_->last_grid_ids_ = grid_ids;
+  exploration_data_->reallocated_ = false;
 
   // hgrid_->checkFirstGrid(grid_ids.front());
 
@@ -1056,7 +1056,7 @@ void FastExplorationManager::findTourOfFrontier(const Vector3d& cur_pos, const V
   t1 = ros::Time::now();
 
   // Create problem file
-  ofstream file(ep_->mtsp_dir_ + "/amtsp_" + to_string(ep_->drone_id_) + ".atsp");
+  ofstream file(exploration_param_->mtsp_dir_ + "/amtsp_" + to_string(exploration_param_->drone_id_) + ".atsp");
   file << "NAME : amtsp\n";
   file << "TYPE : ATSP\n";
   file << "DIMENSION : " + to_string(dimension) + "\n";
@@ -1075,20 +1075,20 @@ void FastExplorationManager::findTourOfFrontier(const Vector3d& cur_pos, const V
   // Create par file
   const int drone_num = 1;
 
-  file.open(ep_->mtsp_dir_ + "/amtsp_" + to_string(ep_->drone_id_) + ".par");
+  file.open(exploration_param_->mtsp_dir_ + "/amtsp_" + to_string(exploration_param_->drone_id_) + ".par");
   file << "SPECIAL\n";
-  file << "PROBLEM_FILE = " + ep_->mtsp_dir_ + "/amtsp_" + to_string(ep_->drone_id_) + ".atsp\n";
+  file << "PROBLEM_FILE = " + exploration_param_->mtsp_dir_ + "/amtsp_" + to_string(exploration_param_->drone_id_) + ".atsp\n";
   file << "SALESMEN = " << to_string(drone_num) << "\n";
   file << "MTSP_OBJECTIVE = MINSUM\n";
-  file << "MTSP_MIN_SIZE = " << to_string(min(int(ed_->frontiers_.size()) / drone_num, 4)) << "\n";
+  file << "MTSP_MIN_SIZE = " << to_string(min(int(exploration_data_->frontiers_.size()) / drone_num, 4)) << "\n";
   file << "MTSP_MAX_SIZE = "
-       << to_string(max(1, int(ed_->frontiers_.size()) / max(1, drone_num - 1))) << "\n";
+       << to_string(max(1, int(exploration_data_->frontiers_.size()) / max(1, drone_num - 1))) << "\n";
   file << "RUNS = 1\n";
   file << "TRACE_LEVEL = 0\n";
-  file << "TOUR_FILE = " + ep_->mtsp_dir_ + "/amtsp_" + to_string(ep_->drone_id_) + ".tour\n";
+  file << "TOUR_FILE = " + exploration_param_->mtsp_dir_ + "/amtsp_" + to_string(exploration_param_->drone_id_) + ".tour\n";
   file.close();
 
-  auto par_dir = ep_->mtsp_dir_ + "/amtsp_" + to_string(ep_->drone_id_) + ".atsp";
+  auto par_dir = exploration_param_->mtsp_dir_ + "/amtsp_" + to_string(exploration_param_->drone_id_) + ".atsp";
   t1 = ros::Time::now();
 
   lkh_mtsp_solver::SolveMTSP srv;
@@ -1104,7 +1104,7 @@ void FastExplorationManager::findTourOfFrontier(const Vector3d& cur_pos, const V
   // Read results
   t1 = ros::Time::now();
 
-  ifstream fin(ep_->mtsp_dir_ + "/amtsp_" + to_string(ep_->drone_id_) + ".tour");
+  ifstream fin(exploration_param_->mtsp_dir_ + "/amtsp_" + to_string(exploration_param_->drone_id_) + ".tour");
   string res;
   vector<int> ids;
   while (getline(fin, res)) {
@@ -1149,7 +1149,7 @@ void FastExplorationManager::findTourOfFrontier(const Vector3d& cur_pos, const V
   //     id -= 1 + drone_num;
   // }
 
-  if (ed_->grid_tour_.size() > 2) {  // Remove id for next grid, since it is considered in the TSP
+  if (exploration_data_->grid_tour_.size() > 2) {  // Remove id for next grid, since it is considered in the TSP
     indices.pop_back();
   }
   // Subset of frontier inside first grid
@@ -1158,15 +1158,15 @@ void FastExplorationManager::findTourOfFrontier(const Vector3d& cur_pos, const V
   }
 
   // Get the path of optimal tour from path matrix
-  frontier_finder_->getPathForTour(cur_pos, indices, ed_->frontier_tour_);
+  frontier_finder_->getPathForTour(cur_pos, indices, exploration_data_->frontier_tour_);
   if (!grid_pos.empty()) {
-    ed_->frontier_tour_.push_back(grid_pos[0]);
+    exploration_data_->frontier_tour_.push_back(grid_pos[0]);
   }
 
-  // ed_->other_tours_.clear();
+  // exploration_data_->other_tours_.clear();
   // for (int i = 1; i < positions.size(); ++i) {
-  //   ed_->other_tours_.push_back({});
-  //   frontier_finder_->getPathForTour(positions[i], others[i - 1], ed_->other_tours_[i - 1]);
+  //   exploration_data_->other_tours_.push_back({});
+  //   frontier_finder_->getPathForTour(positions[i], others[i - 1], exploration_data_->other_tours_[i - 1]);
   // }
 
   double parse_time = (ros::Time::now() - t1).toSec();

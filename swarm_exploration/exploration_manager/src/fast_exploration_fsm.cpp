@@ -51,7 +51,7 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
     "E" };
   fd_->static_state_ = true;
   fd_->trigger_ = false;
-  fd_->avoid_collision_ = false;
+  fd_->avoid_collision_ = true;
   fd_->go_back_ = false;
 
   num_fail_ = 0;
@@ -103,7 +103,7 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
 }
 
 int FastExplorationFSM::getId() {
-  return expl_manager_->ep_->drone_id_;
+  return expl_manager_->exploration_param_->drone_id_;
 }
 
 void FastExplorationFSM::sendStopMsg(int code) {
@@ -137,7 +137,7 @@ bool FastExplorationFSM::isExperimentDone(const Eigen::Vector3d& pos) {
 
   // Check if others move
   const double kMinVel = 0.01;
-  for (const auto& state : expl_manager_->ed_->swarm_state_) {
+  for (const auto& state : expl_manager_->exploration_data_->swarm_state_) {
     finished_exp &= state.vel_.norm() < kMinVel;
   }
 
@@ -190,14 +190,14 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
         // if (!expl_manager_->updateFrontierStruct(fd_->odom_pos_)) {
         ROS_WARN("Go back to (0,0,1)");
         // if (getId() == 1) {
-        //   expl_manager_->ed_->next_pos_ = Eigen::Vector3d(-3, 1.9, 1);
+        //   expl_manager_->exploration_data_->next_pos_ = Eigen::Vector3d(-3, 1.9, 1);
         // } else
-        // expl_manager_->ed_->next_pos_ = Eigen::Vector3d(0, 0.0, 1);
+        // expl_manager_->exploration_data_->next_pos_ = Eigen::Vector3d(0, 0.0, 1);
         // Eigen::Vector3d dir = (fd_->start_pos_ - fd_->odom_pos_);
-        // expl_manager_->ed_->next_yaw_ = atan2(dir[1], dir[0]);
+        // expl_manager_->exploration_data_->next_yaw_ = atan2(dir[1], dir[0]);
 
-        expl_manager_->ed_->next_pos_ = fd_->start_pos_;
-        expl_manager_->ed_->next_yaw_ = 0.0;
+        expl_manager_->exploration_data_->next_pos_ = fd_->start_pos_;
+        expl_manager_->exploration_data_->next_yaw_ = 0.0;
 
         fd_->go_back_ = true;
         transitState(PLAN_TRAJ, "FSM");
@@ -265,7 +265,7 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
         fd_->static_state_ = false;
 
         // fd_->newest_traj_.drone_id = planner_manager_->swarm_traj_data_.drone_id_;
-        fd_->newest_traj_.drone_id = expl_manager_->ep_->drone_id_;
+        fd_->newest_traj_.drone_id = expl_manager_->exploration_param_->drone_id_;
         swarm_traj_pub_.publish(fd_->newest_traj_);
 
         thread vis_thread(&FastExplorationFSM::visualize, this, 2);
@@ -317,7 +317,7 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       } else {
         // Check if reach goal
         auto pos = info->position_traj_.evaluateDeBoorT(t_cur);
-        if ((pos - expl_manager_->ed_->next_pos_).norm() < 1.0) {
+        if ((pos - expl_manager_->exploration_data_->next_pos_).norm() < 1.0) {
           replan_pub_.publish(std_msgs::Empty());
           clearVisMarker();
           transitState(FINISH, "FSM");
@@ -343,7 +343,7 @@ int FastExplorationFSM::callExplorationPlanner() {
   int res;
   if (fd_->avoid_collision_ || fd_->go_back_) {  // Only replan trajectory
     res = expl_manager_->planTrajToView(fd_->start_pt_, fd_->start_vel_, fd_->start_acc_,
-        fd_->start_yaw_, expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
+        fd_->start_yaw_, expl_manager_->exploration_data_->next_pos_, expl_manager_->exploration_data_->next_yaw_);
     fd_->avoid_collision_ = false;
   } else {  // Do full planning normally
     res = expl_manager_->planExploreMotion(
@@ -385,7 +385,7 @@ void FastExplorationFSM::visualize(int content) {
   // content 1: frontier; 2 paths & trajs
   auto info = &planner_manager_->local_data_;
   auto plan_data = &planner_manager_->plan_data_;
-  auto ed_ptr = expl_manager_->ed_;
+  auto ed_ptr = expl_manager_->exploration_data_;
 
   auto getColorVal = [&](const int& id, const int& num, const int& drone_id) {
     double a = (drone_id - 1) / double(num + 1);
@@ -401,7 +401,7 @@ void FastExplorationFSM::visualize(int content) {
       visualization_->drawCubes(ed_ptr->frontiers_[i], 0.1,
           visualization_->getColor(double(i) / ed_ptr->frontiers_.size(), 0.4), "frontier", i, 4);
 
-      // getColorVal(i, expl_manager_->ep_->drone_num_, expl_manager_->ep_->drone_id_)
+      // getColorVal(i, expl_manager_->exploration_param_->drone_num_, expl_manager_->exploration_param_->drone_id_)
       // double(i) / ed_ptr->frontiers_.size()
 
       // visualization_->drawBox(ed_ptr->frontier_boxes_[i].first,
@@ -429,7 +429,7 @@ void FastExplorationFSM::visualize(int content) {
     //     (bmin + bmax) / 2.0, bmax - bmin, Vector4d(0, 1, 0, 0.3), "updated_box", 0, 4);
 
     // vector<Eigen::Vector3d> bmins, bmaxs;
-    // planner_manager_->edt_environment_->sdf_map_->mm_->getChunkBoxes(bmins, bmaxs, false);
+    // planner_manager_->edt_environment_->sdf_map_->multi_map_->getChunkBoxes(bmins, bmaxs, false);
     // for (int i = 0; i < bmins.size(); ++i) {
     //   visualization_->drawBox((bmins[i] + bmaxs[i]) / 2.0, bmaxs[i] - bmins[i],
     //       Vector4d(0, 1, 1, 0.3), "updated_box", i + 1, 4);
@@ -437,8 +437,8 @@ void FastExplorationFSM::visualize(int content) {
 
     // Publish current goal
     auto color =
-        PlanningVisualization::getColor((getId() - 1) / double(expl_manager_->ep_->drone_num_));
-    visualization_->drawArrow(expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_,
+        PlanningVisualization::getColor((getId() - 1) / double(expl_manager_->exploration_param_->drone_num_));
+    visualization_->drawArrow(expl_manager_->exploration_data_->next_pos_, expl_manager_->exploration_data_->next_yaw_,
         Eigen::Vector3d(0.75, 0.3, 0.75), color, "goal", 0, 9);
 
   } else if (content == 2) {
@@ -449,7 +449,7 @@ void FastExplorationFSM::visualize(int content) {
     // visualization_->drawLines(pts1, pts2, 0.05, Eigen::Vector4d(1, 0.3, 0, 1), "partition", 0,
     // 6);
 
-    if (expl_manager_->ep_->drone_id_ == 1) {
+    if (expl_manager_->exploration_param_->drone_id_ == 1) {
       vector<Eigen::Vector3d> pts1, pts2;
       expl_manager_->hgrid_->getGridMarker(pts1, pts2);
       visualization_->drawLines(pts1, pts2, 0.05, Eigen::Vector4d(1, 0, 1, 0.5), "partition", 1, 6);
@@ -484,13 +484,13 @@ void FastExplorationFSM::visualize(int content) {
       // hgrid_pub_.publish(hgrid);
     }
 
-    auto grid_tour = expl_manager_->ed_->grid_tour_;
-    // auto grid_tour = expl_manager_->ed_->grid_tour2_;
+    auto grid_tour = expl_manager_->exploration_data_->grid_tour_;
+    // auto grid_tour = expl_manager_->exploration_data_->grid_tour2_;
     // for (auto& pt : grid_tour) pt = pt + trans;
 
     visualization_->drawLines(grid_tour, 0.05,
         PlanningVisualization::getColor(
-            (expl_manager_->ep_->drone_id_ - 1) / double(expl_manager_->ep_->drone_num_)),
+            (expl_manager_->exploration_param_->drone_id_ - 1) / double(expl_manager_->exploration_param_->drone_num_)),
         "grid_tour", 0, 6);
 
     // Publish grid tour to ground node
@@ -502,14 +502,14 @@ void FastExplorationFSM::visualize(int content) {
       point.z = grid_tour[i][2];
       tour.points.push_back(point);
     }
-    tour.drone_id = expl_manager_->ep_->drone_id_;
+    tour.drone_id = expl_manager_->exploration_param_->drone_id_;
     tour.stamp = ros::Time::now().toSec();
     grid_tour_pub_.publish(tour);
 
     // visualization_->drawSpheres(
-    //     expl_manager_->ed_->grid_tour_, 0.3, Eigen::Vector4d(0, 1, 0, 1), "grid_tour", 1, 6);
+    //     expl_manager_->exploration_data_->grid_tour_, 0.3, Eigen::Vector4d(0, 1, 0, 1), "grid_tour", 1, 6);
     // visualization_->drawLines(
-    //     expl_manager_->ed_->grid_tour2_, 0.05, Eigen::Vector4d(0, 1, 0, 0.5), "grid_tour", 2, 6);
+    //     expl_manager_->exploration_data_->grid_tour2_, 0.05, Eigen::Vector4d(0, 1, 0, 0.5), "grid_tour", 2, 6);
 
     // Top viewpoints and frontier tour-------------------------------------
 
@@ -523,7 +523,7 @@ void FastExplorationFSM::visualize(int content) {
     // for (auto& pt : frontier) pt = pt + trans;
     // visualization_->drawLines(frontier, 0.07,
     //     PlanningVisualization::getColor(
-    //         (expl_manager_->ep_->drone_id_ - 1) / double(expl_manager_->ep_->drone_num_), 0.6),
+    //         (expl_manager_->exploration_param_->drone_id_ - 1) / double(expl_manager_->exploration_param_->drone_num_), 0.6),
     //     "frontier_tour", 0, 6);
 
     // for (int i = 0; i < ed_ptr->other_tours_.size(); ++i) {
@@ -541,7 +541,7 @@ void FastExplorationFSM::visualize(int content) {
     // visualization_->drawLines(
     //     ed_ptr->refined_tour_, 0.07,
     //     PlanningVisualization::getColor(
-    //         (expl_manager_->ep_->drone_id_ - 1) / double(expl_manager_->ep_->drone_num_), 0.6),
+    //         (expl_manager_->exploration_param_->drone_id_ - 1) / double(expl_manager_->exploration_param_->drone_num_), 0.6),
     //     "refined_tour", 0, 6);
 
     // visualization_->drawLines(ed_ptr->refined_views1_, ed_ptr->refined_views2_, 0.04, Vector4d(0,
@@ -580,13 +580,13 @@ void FastExplorationFSM::visualize(int content) {
 
     visualization_->drawBspline(info->position_traj_, 0.1,
         PlanningVisualization::getColor(
-            (expl_manager_->ep_->drone_id_ - 1) / double(expl_manager_->ep_->drone_num_)),
+            (expl_manager_->exploration_param_->drone_id_ - 1) / double(expl_manager_->exploration_param_->drone_num_)),
         false, 0.15, Vector4d(1, 1, 0, 1));
 
     // visualization_->drawLines(
-    //     expl_manager_->ed_->path_next_goal_, 0.1, Eigen::Vector4d(0, 1, 0, 1), "astar", 0, 6);
+    //     expl_manager_->exploration_data_->path_next_goal_, 0.1, Eigen::Vector4d(0, 1, 0, 1), "astar", 0, 6);
     // visualization_->drawSpheres(
-    //     expl_manager_->ed_->kino_path_, 0.1, Eigen::Vector4d(0, 0, 1, 1), "kino", 0, 6);
+    //     expl_manager_->exploration_data_->kino_path_, 0.1, Eigen::Vector4d(0, 0, 1, 1), "kino", 0, 6);
     // visualization_->drawSpheres(plan_data->kino_path_, 0.1, Vector4d(1, 0, 1, 1), "kino_path", 0,
     // 0); visualization_->drawLines(ed_ptr->path_next_goal_, 0.05, Vector4d(0, 1, 1, 1),
     // "next_goal", 1, 6);
@@ -622,7 +622,7 @@ void FastExplorationFSM::clearVisMarker() {
 void FastExplorationFSM::frontierCallback(const ros::TimerEvent& e) {
   if (state_ == WAIT_TRIGGER) {
     auto ft = expl_manager_->frontier_finder_;
-    auto ed = expl_manager_->ed_;
+    auto ed = expl_manager_->exploration_data_;
 
     auto getColorVal = [&](const int& id, const int& num, const int& drone_id) {
       double a = (drone_id - 1) / double(num + 1);
@@ -649,7 +649,7 @@ void FastExplorationFSM::frontierCallback(const ros::TimerEvent& e) {
     for (int i = 0; i < ed->frontiers_.size(); ++i) {
       visualization_->drawCubes(ed->frontiers_[i], 0.1,
           visualization_->getColor(double(i) / ed->frontiers_.size(), 0.4), "frontier", i, 4);
-      // getColorVal(i, expl_manager_->ep_->drone_num_, expl_manager_->ep_->drone_id_)
+      // getColorVal(i, expl_manager_->exploration_param_->drone_num_, expl_manager_->exploration_param_->drone_id_)
       // double(i) / ed->frontiers_.size()
       // visualization_->drawBox(ed->frontier_boxes_[i].first, ed->frontier_boxes_[i].second,
       // Vector4d(0.5, 0, 1, 0.3),
@@ -678,10 +678,10 @@ void FastExplorationFSM::triggerCallback(const geometry_msgs::PoseStampedConstPt
   // // Debug traj planner
   // Eigen::Vector3d pos;
   // pos << msg->pose.position.x, msg->pose.position.y, 1;
-  // expl_manager_->ed_->next_pos_ = pos;
+  // expl_manager_->exploration_data_->next_pos_ = pos;
 
   // Eigen::Vector3d dir = pos - fd_->odom_pos_;
-  // expl_manager_->ed_->next_yaw_ = atan2(dir[1], dir[0]);
+  // expl_manager_->exploration_data_->next_yaw_ = atan2(dir[1], dir[0]);
   // fd_->go_back_ = true;
   // transitState(PLAN_TRAJ, "triggerCallback");
   // return;
@@ -766,7 +766,7 @@ void FastExplorationFSM::droneStateTimerCallback(const ros::TimerEvent& e) {
   exploration_manager::DroneState msg;
   msg.drone_id = getId();
 
-  auto& state = expl_manager_->ed_->swarm_state_[msg.drone_id - 1];
+  auto& state = expl_manager_->exploration_data_->swarm_state_[msg.drone_id - 1];
 
   if (fd_->static_state_) {
     state.pos_ = fd_->odom_pos_;
@@ -798,7 +798,7 @@ void FastExplorationFSM::droneStateMsgCallback(const exploration_manager::DroneS
   Eigen::Vector3d msg_pos(msg->pos[0], msg->pos[1], msg->pos[2]);
   if ((msg_pos - fd_->odom_pos_).norm() > fp_->communication_range_) return;
 
-  auto& drone_state = expl_manager_->ed_->swarm_state_[msg->drone_id - 1];
+  auto& drone_state = expl_manager_->exploration_data_->swarm_state_[msg->drone_id - 1];
   if (drone_state.stamp_ + 1e-4 >= msg->stamp) return;  // Avoid unordered msg
 
   drone_state.pos_ = Eigen::Vector3d(msg->pos[0], msg->pos[1], msg->pos[2]);
@@ -817,7 +817,7 @@ void FastExplorationFSM::optTimerCallback(const ros::TimerEvent& e) {
   if (state_ == INIT) return;
 
   // Select nearby drone not interacting with recently
-  auto& states = expl_manager_->ed_->swarm_state_;
+  auto& states = expl_manager_->exploration_data_->swarm_state_;
   auto& state1 = states[getId() - 1];
   // bool urgent = (state1.grid_ids_.size() <= 1 /* && !state1.grid_ids_.empty() */);
   bool urgent = state1.grid_ids_.empty();
@@ -947,7 +947,7 @@ void FastExplorationFSM::optTimerCallback(const ros::TimerEvent& e) {
   //    ros::Time::now().toSec() - tn, alloc_time);
 
   // Reserve the result and wait...
-  auto ed = expl_manager_->ed_;
+  auto ed = expl_manager_->exploration_data_;
   ed->ego_ids_ = ego_ids;
   ed->other_ids_ = other_ids;
   ed->pair_opt_stamp_ = opt.stamp;
@@ -963,7 +963,7 @@ void FastExplorationFSM::findUnallocated(const vector<int>& actives, vector<int>
   }
 
   // Remove allocated ones
-  for (auto state : expl_manager_->ed_->swarm_state_) {
+  for (auto state : expl_manager_->exploration_data_->swarm_state_) {
     for (auto id : state.grid_ids_) {
       if (active_map.find(id) != active_map.end()) {
         active_map.erase(id);
@@ -983,11 +983,11 @@ void FastExplorationFSM::optMsgCallback(const exploration_manager::PairOptConstP
   if (msg->from_drone_id == getId() || msg->to_drone_id != getId()) return;
 
   // Check stamp to avoid unordered/repeated msg
-  if (msg->stamp <= expl_manager_->ed_->pair_opt_stamps_[msg->from_drone_id - 1] + 1e-4) return;
-  expl_manager_->ed_->pair_opt_stamps_[msg->from_drone_id - 1] = msg->stamp;
+  if (msg->stamp <= expl_manager_->exploration_data_->pair_opt_stamps_[msg->from_drone_id - 1] + 1e-4) return;
+  expl_manager_->exploration_data_->pair_opt_stamps_[msg->from_drone_id - 1] = msg->stamp;
 
-  auto& state1 = expl_manager_->ed_->swarm_state_[msg->from_drone_id - 1];
-  auto& state2 = expl_manager_->ed_->swarm_state_[getId() - 1];
+  auto& state1 = expl_manager_->exploration_data_->swarm_state_[msg->from_drone_id - 1];
+  auto& state2 = expl_manager_->exploration_data_->swarm_state_[getId() - 1];
 
   // auto tn = ros::Time::now().toSec();
   exploration_manager::PairOptResponse response;
@@ -1012,7 +1012,7 @@ void FastExplorationFSM::optMsgCallback(const exploration_manager::PairOptConstP
 
     state1.recent_interact_time_ = msg->stamp;
     state2.recent_attempt_time_ = ros::Time::now().toSec();
-    expl_manager_->ed_->reallocated_ = true;
+    expl_manager_->exploration_data_->reallocated_ = true;
 
     if (state_ == IDLE && !state2.grid_ids_.empty()) {
       transitState(PLAN_TRAJ, "optMsgCallback");
@@ -1033,10 +1033,10 @@ void FastExplorationFSM::optResMsgCallback(
   if (msg->from_drone_id == getId() || msg->to_drone_id != getId()) return;
 
   // Check stamp to avoid unordered/repeated msg
-  if (msg->stamp <= expl_manager_->ed_->pair_opt_res_stamps_[msg->from_drone_id - 1] + 1e-4) return;
-  expl_manager_->ed_->pair_opt_res_stamps_[msg->from_drone_id - 1] = msg->stamp;
+  if (msg->stamp <= expl_manager_->exploration_data_->pair_opt_res_stamps_[msg->from_drone_id - 1] + 1e-4) return;
+  expl_manager_->exploration_data_->pair_opt_res_stamps_[msg->from_drone_id - 1] = msg->stamp;
 
-  auto ed = expl_manager_->ed_;
+  auto ed = expl_manager_->exploration_data_;
   // Verify the consistency of pair opt via time stamp
   if (!ed->wait_response_ || fabs(ed->pair_opt_stamp_ - msg->stamp) > 1e-5) return;
 
@@ -1137,7 +1137,7 @@ void FastExplorationFSM::swarmTrajTimerCallback(const ros::TimerEvent& e) {
     for (int i = 0; i < knots.rows(); ++i) {
       bspline.knots.push_back(knots(i));
     }
-    bspline.drone_id = expl_manager_->ep_->drone_id_;
+    bspline.drone_id = expl_manager_->exploration_param_->drone_id_;
     swarm_traj_pub_.publish(bspline);
   }
 }

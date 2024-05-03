@@ -10,9 +10,12 @@
 #include <nav_msgs/Odometry.h>
 #include <visualization_msgs/Marker.h>
 #include <exploration_manager/DroneState.h>
+
 #include <exploration_manager/PairOpt.h>
 #include <exploration_manager/PairOptResponse.h>
 #include <exploration_manager/collaboration_assigner.h>
+#include <mrs_msgs/TrajectoryReferenceSrv.h>
+#include <mrs_msgs/ReferenceStampedSrv.h>
 #include <bspline/Bspline.h>
 
 #include <algorithm>
@@ -88,6 +91,8 @@ private:
   void optResMsgCallback(const exploration_manager::PairOptResponseConstPtr& msg);
   void swarmTrajCallback(const bspline::BsplineConstPtr& msg);
   void swarmTrajTimerCallback(const ros::TimerEvent& e);
+  geometry_msgs::Pose mrsFly(Vector3d& pos);
+
 
   /* planning utils */
   shared_ptr<FastPlannerManager> planner_manager_;
@@ -95,15 +100,17 @@ private:
   shared_ptr<PlanningVisualization> visualization_;
   shared_ptr<CollaborationAssigner> coll_assigner_;
 
-  shared_ptr<FSMParam> fp_;
-  shared_ptr<FSMData> fd_;
+
+  shared_ptr<FSMParam> fame_params_;
+  shared_ptr<FSMData> fame_data_;
   EXPL_STATE state_;
 
   /* ROS utils */
   ros::NodeHandle node_;
   ros::Timer exec_timer_, safety_timer_, vis_timer_, frontier_timer_;
   ros::Subscriber trigger_sub_, odom_sub_;
-  ros::Publisher replan_pub_, new_pub_, bspline_pub_;
+  ros::Publisher replan_pub_, new_pub_, bspline_pub_,pose_pub_;
+  ros::ServiceClient service_goto_reference;
 
   // Logging
   ros::Timer heartbit_timer_;

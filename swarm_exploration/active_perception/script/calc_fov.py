@@ -7,8 +7,8 @@ import numpy as np
 # cam_cy:     243.449
 # # cam_cx:     321.046
 
-# proj_pt(0) = (u - mp_.cx_) * depth / mp_.fx_;
-# proj_pt(1) = (v - mp_.cy_) * depth / mp_.fy_;
+# proj_pt(0) = (u - map_param_.cx_) * depth / map_param_.fx_;
+# proj_pt(1) = (v - map_param_.cy_) * depth / map_param_.fy_;
 
 left = atan2(321.046, 387.229)
 right = atan2(640-321.046, 387.229)

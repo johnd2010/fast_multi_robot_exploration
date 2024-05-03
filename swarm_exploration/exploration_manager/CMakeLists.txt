@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   geometry_msgs
-  quadrotor_msgs
+  mrs_msgs
   plan_env
   path_searching
   bspline
@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   traj_utils
   active_perception
   lkh_tsp_solver
+  mrs_lib
   lkh_mtsp_solver
   plan_manage
   cv_bridge
@@ -53,6 +54,7 @@ catkin_package(
 include_directories(
   include
   SYSTEM
+  /usr/local/include/
   ${catkin_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIR}
   ${PCL_INCLUDE_DIRS}
@@ -65,6 +67,7 @@ add_executable(exploration_node
   src/fast_exploration_manager.cpp
   )
 target_link_libraries(exploration_node 
+  /usr/local/lib/libnlopt.so
   ${catkin_LIBRARIES}
   -ldw
   )
@@ -80,6 +83,7 @@ add_executable(fame_node
 
 target_link_libraries(fame_node 
   ${catkin_LIBRARIES}
+  /usr/local/lib/libnlopt.so
   -ldw
   )
 

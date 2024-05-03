@@ -1,7 +1,7 @@
 #include "bspline/non_uniform_bspline.h"
 #include "nav_msgs/Odometry.h"
 #include "bspline/Bspline.h"
-#include "quadrotor_msgs/PositionCommand.h"
+// #include "quadrotor_msgs/PositionCommand.h"
 #include "std_msgs/Empty.h"
 #include "visualization_msgs/Marker.h"
 #include <ros/ros.h>

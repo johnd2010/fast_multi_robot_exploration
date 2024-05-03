@@ -6,7 +6,7 @@
   
   <!-- Global odom prefix -->
   <arg name="odom_prefix" value="/state_ukf/odom" />
-  <arg name="drone_num"   default="4" />
+  <arg name="drone_num"   default="1" />
   
   <!-- Planner Type -->
   <arg name="planner_type"    default="fame"/>
@@ -29,6 +29,7 @@
   <!-- Map generation -->
   <node pkg ="map_generator" name ="map_pub" type ="map_pub" output = "screen" args="$(find map_generator)/resource/$(arg model).pcd" unless="$(arg vulkan_renderer)"> 
   </node>
+  <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find exploration_manager)/config/swarm.rviz" />
 
 <include file="$(find exploration_manager)/launch/single_drone_exploration.xml" if="$(eval arg('drone_num') >= 1)">
     <arg name="drone_id" value="1"/>
