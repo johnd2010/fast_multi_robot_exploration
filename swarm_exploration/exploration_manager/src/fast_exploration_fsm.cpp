@@ -14,7 +14,6 @@
 #include <active_perception/perception_utils.h>
 #include <active_perception/hgrid.h>
 // #include <active_perception/uniform_grid.h>
-// #include <lkh_tsp_solver/lkh_interface.h>
 // #include <lkh_mtsp_solver/lkh3_interface.h>
 
 #include <std_msgs/Bool.h>

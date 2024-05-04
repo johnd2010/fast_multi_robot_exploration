@@ -19,7 +19,6 @@ find_package(catkin REQUIRED COMPONENTS
   bspline_opt
   traj_utils
   active_perception
-  lkh_tsp_solver
   mrs_lib
   lkh_mtsp_solver
   plan_manage
@@ -47,7 +46,7 @@ generate_messages(
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES exploration_manager
- CATKIN_DEPENDS plan_env path_searching bspline bspline_opt active_perception traj_utils lkh_tsp_solver lkh_mtsp_solver plan_manage message_runtime
+ CATKIN_DEPENDS plan_env path_searching bspline bspline_opt active_perception traj_utils lkh_mtsp_solver plan_manage message_runtime
 #  DEPENDS system_lib
 )
 

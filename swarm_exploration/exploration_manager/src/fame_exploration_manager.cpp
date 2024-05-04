@@ -13,7 +13,6 @@
 #include <plan_env/sdf_map.h>
 #include <plan_env/edt_environment.h>
 #include <plan_manage/planner_manager.h>
-#include <lkh_tsp_solver/SolveTSP.h>
 #include <lkh_mtsp_solver/SolveMTSP.h>
 
 #include <exploration_manager/expl_data.h>
@@ -851,91 +850,7 @@ void FameExplorationManager::shortenPath(vector<Vector3d>& path) {
   path = short_tour;
 }
 
-void FameExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vector3d& cur_vel,
-    const Vector3d cur_yaw, vector<int>& indices) {
-  auto t1 = ros::Time::now();
 
-  // Get cost matrix for current state and clusters
-  Eigen::MatrixXd cost_mat;
-  frontier_finder_->getFullCostMatrix(cur_pos, cur_vel, cur_yaw, cost_mat);
-  const int dimension = cost_mat.rows();
-  // std::cout << "mat:   " << cost_mat.rows() << std::endl;
-
-  double mat_time = (ros::Time::now() - t1).toSec();
-  t1 = ros::Time::now();
-
-  // Initialize TSP par file
-  ofstream par_file(ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".par");
-  par_file << "PROBLEM_FILE = " << ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".tsp\n";
-  par_file << "GAIN23 = NO\n";
-  par_file << "OUTPUT_TOUR_FILE ="
-           << ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) +
-                  ".tou"
-                  "r\n";
-  par_file << "RUNS = 1\n";
-  par_file.close();
-
-  // Write params and cost matrix to problem file
-  ofstream prob_file(ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".tsp");
-  // Problem specification part, follow the format of TSPLIB
-  string prob_spec;
-  prob_spec = "NAME : single\nTYPE : ATSP\nDIMENSION : " + to_string(dimension) +
-              "\nEDGE_WEIGHT_TYPE : "
-              "EXPLICIT\nEDGE_WEIGHT_FORMAT : FULL_MATRIX\nEDGE_WEIGHT_SECTION\n";
-  prob_file << prob_spec;
-  // prob_file << "TYPE : TSP\n";
-  // prob_file << "EDGE_WEIGHT_FORMAT : LOWER_ROW\n";
-  // Problem data part
-  const int scale = 100;
-  for (int i = 0; i < dimension; ++i) {
-    for (int j = 0; j < dimension; ++j) {
-      int int_cost = cost_mat(i, j) * scale;
-      prob_file << int_cost << " ";
-    }
-    prob_file << "\n";
-  }
-  prob_file << "EOF";
-  prob_file.close();
-
-  // solveTSPLKH((ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".par").c_str());
-  lkh_tsp_solver::SolveTSP srv;
-  if (!tsp_client_.call(srv)) {
-    ROS_ERROR("Fail to solve TSP.");
-    return;
-  }
-
-  // Read optimal tour from the tour section of result file
-  ifstream res_file(ep_->tsp_dir_ + "/drone_" + to_string(ep_->drone_id_) + ".tour");
-  string res;
-  while (getline(res_file, res)) {
-    // Go to tour section
-    if (res.compare("TOUR_SECTION") == 0) break;
-  }
-
-  // Read path for ATSP formulation
-  while (getline(res_file, res)) {
-    // Read indices of frontiers in optimal tour
-    int id = stoi(res);
-    if (id == 1)  // Ignore the current state
-      continue;
-    if (id == -1) break;
-    indices.push_back(id - 2);  // Idx of solver-2 == Idx of frontier
-  }
-
-  res_file.close();
-
-  std::cout << "Tour " << ep_->drone_id_ << ": ";
-  for (auto id : indices) std::cout << id << ", ";
-  std::cout << "" << std::endl;
-
-  // Get the path of optimal tour from path matrix
-  frontier_finder_->getPathForTour(cur_pos, indices, ed_->frontier_tour_);
-
-  double tsp_time = (ros::Time::now() - t1).toSec();
-  ROS_INFO("Cost mat: %lf, TSP: %lf", mat_time, tsp_time);
-
-  // if (tsp_time > 0.1) ROS_BREAK();
-}
 
 void FameExplorationManager::refineLocalTour(const Vector3d& cur_pos, const Vector3d& cur_vel,
     const Vector3d& cur_yaw, const vector<vector<Vector3d>>& n_points,

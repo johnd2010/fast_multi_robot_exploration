@@ -27,8 +27,8 @@
   <arg name="communication_range" default="100000.0"/>
   
   <!-- Map generation -->
-  <node pkg ="map_generator" name ="map_pub" type ="map_pub" output = "screen" args="$(find map_generator)/resource/$(arg model).pcd" unless="$(arg vulkan_renderer)"> 
-  </node>
+  <!-- <node pkg ="map_generator" name ="map_pub" type ="map_pub" output = "screen" args="$(find map_generator)/resource/$(arg model).pcd" unless="$(arg vulkan_renderer)"> 
+  </node> -->
   <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find exploration_manager)/config/swarm.rviz" />
 
 <include file="$(find exploration_manager)/launch/single_drone_exploration.xml" if="$(eval arg('drone_num') >= 1)">
