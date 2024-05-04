@@ -21,7 +21,7 @@
     <arg name="odom_prefix" default="odom"/>
     <arg name="simulation" default="false"/>
     <arg name="vulkan_renderer" default="false"/>
-    <arg name="odometry_topic" default="$(arg odom_prefix)_$(arg drone_id)"/>
+    <arg name="odometry_topic" default="/uav1/estimation_manager/odom_main"/>
     <!-- <arg name="odometry_topic" default="/pcl_render_node/odom_$(arg drone_id)"/> -->
     <arg name="sensor_pose_topic" default="/pcl_render_node/sensor_pose_$(arg drone_id)"/> 
     <arg name="depth_topic" default="/pcl_render_node/depth_$(arg drone_id)"/> 
@@ -68,7 +68,7 @@
     <!-- subscribe ONLY TO ONE of the two topics -->
     <arg name="depth_topic" value="$(arg depth_topic)"/> 
 
-    <arg name="cloud_topic" value="/pcl_render_node/cloud_$(arg drone_id)"/>
+    <arg name="cloud_topic" value="/uav1/octomap_global_vis/octomap_point_cloud_centers"/>
 
     <!-- intrinsic params of the depth camera -->
     <arg name="cx" value="$(arg cx)"/>
@@ -118,19 +118,6 @@
     <param name="perception_utils/vis_dist" value="1.0" type="double"/>
   </node>
 
-  <!-- use simulator (with/out Vulkan renderer) -->
-  <include file="$(find exploration_manager)/launch/simulator_light_vulkan.xml" if="$(eval arg('simulation') and arg('vulkan_renderer'))">
-    <arg name="drone_id" value="$(arg drone_id)"/>
-    <arg name="drone_num" value="$(arg drone_num)"/>
-    <arg name="init_x"   value="$(arg init_x)"/>
-    <arg name="init_y"   value="$(arg init_y)"/>
-    <arg name="init_z"   value="$(arg init_z)"/> 
-    <arg name="map_size_x" value="$(arg map_size_x)"/>
-    <arg name="map_size_y" value="$(arg map_size_y)"/>
-    <arg name="map_size_z" value="$(arg map_size_z)"/>
-    <arg name="odometry_topic" value="$(arg odom_prefix)_$(arg drone_id)" />
-    <arg name="model_vulkan" value="$(arg model)"/>
-  </include>
   
   <include file="$(find exploration_manager)/launch/simulator_light.xml" if="$(eval arg('simulation') and not arg('vulkan_renderer'))">
     <arg name="drone_id" value="$(arg drone_id)"/>
@@ -141,7 +128,7 @@
     <arg name="map_size_x" value="$(arg map_size_x)"/>
     <arg name="map_size_y" value="$(arg map_size_y)"/>
     <arg name="map_size_z" value="$(arg map_size_z)"/>
-    <arg name="odometry_topic" value="$(arg odom_prefix)_$(arg drone_id)" />
+    <arg name="odometry_topic" value="$(arg odometry_topic)" />
   </include>
 
   <!-- lcm communication -->

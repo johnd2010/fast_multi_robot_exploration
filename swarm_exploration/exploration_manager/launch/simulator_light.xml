@@ -48,7 +48,7 @@
       <param name="map/init_y"     value="$(arg init_y)"/>
       <param name="map/drone_id"     value="$(arg drone_id)"/>
 
-      <remap from="~global_map" to="/map_generator/global_cloud"/>
+      <remap from="~global_map" to="/uav1/octomap_global_vis/octomap_point_cloud_centers"/>
       <remap from="~odometry"   to="$(arg odometry_topic)"/>
       <remap from="/pcl_render_node/depth" to="/pcl_render_node/depth_$(arg drone_id)"/>
       <remap from="/pcl_render_node/sensor_pose" to="/pcl_render_node/sensor_pose_$(arg drone_id)"/>
