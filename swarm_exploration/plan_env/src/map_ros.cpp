@@ -56,7 +56,7 @@ void MapROS::init() {
   rand_noise_ = normal_distribution<double>(0, 0.1);
   random_device rd;
   eng_ = default_random_engine(rd());
-
+  
   esdf_timer_ = node_.createTimer(ros::Duration(0.05), &MapROS::updateESDFCallback, this);
   vis_timer_ = node_.createTimer(ros::Duration(0.2), &MapROS::visCallback, this);
 
@@ -81,9 +81,9 @@ void MapROS::init() {
   sync_image_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePose>(
       MapROS::SyncPolicyImagePose(2), *depth_sub_, *pose_sub_));
   sync_image_pose_->registerCallback(boost::bind(&MapROS::depthPoseCallback, this, _1, _2));
-  // sync_cloud_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyCloudPose>(
-  //     MapROS::SyncPolicyCloudPose(2), *cloud_sub_, *pose_sub_));
-  // sync_cloud_pose_->registerCallback(boost::bind(&MapROS::cloudPoseCallback, this, _1, _2));
+  sync_cloud_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyCloudPose>(
+      MapROS::SyncPolicyCloudPose(2), *cloud_sub_, *pose_sub_));
+  sync_cloud_pose_->registerCallback(boost::bind(&MapROS::cloudPoseCallback, this, _1, _2));
 
   map_start_time_ = ros::Time::now();
 }
