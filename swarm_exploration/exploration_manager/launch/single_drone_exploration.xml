@@ -21,7 +21,7 @@
     <arg name="odom_prefix" default="odom"/>
     <arg name="simulation" default="false"/>
     <arg name="vulkan_renderer" default="false"/>
-    <arg name="odometry_topic" default="/uav1/estimation_manager/odom_main"/>
+    <arg name="odometry_topic" default="/uav1/estimation_manager/odom_world"/>
     <!-- <arg name="odometry_topic" default="/pcl_render_node/odom_$(arg drone_id)"/> -->
     <arg name="sensor_pose_topic" default="/uav1/pose/cam_to_world"/> 
     <arg name="depth_topic" default="/pcl_render_node/depth_$(arg drone_id)"/> 
@@ -68,7 +68,7 @@
     <!-- subscribe ONLY TO ONE of the two topics -->
     <arg name="depth_topic" value="$(arg depth_topic)"/> 
 
-    <!-- <arg name="cloud_topic" value="/uav1/pcl_filter_ouster/points_processed"/> -->
+    <!-- <arg name="cloud_topic" value="/uav1/pcl_filter_ouster/points_processed_world"/> -->
     <arg name="cloud_topic" value="/uav1/octomap_global_vis/octomap_point_cloud_centers"/>
 
 
@@ -96,7 +96,7 @@
 
   <!-- trajectory server -->
   <node pkg="plan_manage" name="traj_server_$(arg drone_id)" type="traj_server" output="screen">
-    <remap from="/odom_world" to="$(arg odom_prefix)_$(arg drone_id)"/>
+    <remap from="/odom_world" to="/uav1/estimation_manager/odom_world"/>
 
     <remap from="/planning/bspline" to="/planning/bspline_$(arg drone_id)" />
     <remap from="/planning/replan" to="/planning/replan_$(arg drone_id)" />
@@ -116,8 +116,8 @@
     <param name="perception_utils/top_angle" value="0.56125" type="double"/>
     <param name="perception_utils/left_angle" value="0.69222" type="double"/>
     <param name="perception_utils/right_angle" value="0.68901" type="double"/>
-    <param name="perception_utils/max_dist" value="4.5" type="double"/>
-    <param name="perception_utils/vis_dist" value="1.0" type="double"/>
+    <param name="perception_utils/max_dist" value="10.0" type="double"/>
+    <param name="perception_utils/vis_dist" value="10.0" type="double"/>
   </node>
 
   

@@ -41,7 +41,7 @@
     <arg name="map_size_z" value="$(arg map_size_z)"/>
     <arg name="odom_prefix" value="$(arg odom_prefix)"/>
     <arg name="drone_num" value="$(eval arg('drone_num') + 1)"/>
-    <arg name="simulation" default="true"/>
+    <arg name="simulation" default="false"/>
     <arg name="vulkan_renderer" value="$(arg vulkan_renderer)"/>
     <arg name="model" value="$(arg model)"/>
     <arg name="planner_type" value="$(arg planner_type)"/>
