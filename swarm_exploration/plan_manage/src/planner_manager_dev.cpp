@@ -174,7 +174,7 @@ bool FastPlannerManager::localExplore(Eigen::Vector3d start, Eigen::Vector3d sta
     points_cloud.width = points_cloud.points.size();
     points_cloud.height = 1;
     points_cloud.is_dense = true;
-    points_cloud.header.frame_id = "world";
+    points_cloud.header.frame_id = "uav1/world_origin";
     sensor_msgs::PointCloud2 cloud_msg;
     pcl::toROSMsg(points_cloud, cloud_msg);
 
@@ -239,7 +239,7 @@ bool FastPlannerManager::localExplore(Eigen::Vector3d start, Eigen::Vector3d sta
     points_cloud.width = points_cloud.points.size();
     points_cloud.height = 1;
     points_cloud.is_dense = true;
-    points_cloud.header.frame_id = "world";
+    points_cloud.header.frame_id = "uav1/world_origin";
     pcl::toROSMsg(points_cloud, cloud_msg);
   }
 

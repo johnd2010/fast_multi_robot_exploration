@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
   Matrix3d R3 = Rz * Ry * Rx;
 
   nav_msgs::Odometry odom;
-  odom.header.frame_id = "world";
+  odom.header.frame_id = "uav1/world_origin";
   odom.header.stamp = ros::Time::now();
 
   // pub R
@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
   p4 = Rz * Ry * p0;
 
   visualization_msgs::Marker m;
-  m.header.frame_id = "world";
+  m.header.frame_id = "uav1/world_origin";
   m.header.stamp = ros::Time::now();
   m.type = visualization_msgs::Marker::SPHERE_LIST;
   m.action = visualization_msgs::Marker::ADD;

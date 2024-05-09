@@ -36,7 +36,7 @@ void MapROS::init() {
   node_.param("map_ros/show_occ_time", show_occ_time_, false);
   node_.param("map_ros/show_esdf_time", show_esdf_time_, false);
   node_.param("map_ros/show_all_map", show_all_map_, false);
-  node_.param("map_ros/frame_id", frame_id_, string("world"));
+  node_.param("map_ros/frame_id", frame_id_, string("uav1/world_origin"));
 
   proj_points_.resize(640 * 480 / (skip_pixel_ * skip_pixel_));
   point_cloud_.points.resize(640 * 480 / (skip_pixel_ * skip_pixel_));

@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
   cloud_map.width = cloud_map.points.size();
   cloud_map.height = 1;
   cloud_map.is_dense = true;
-  cloud_map.header.frame_id = "world";
+  cloud_map.header.frame_id = "uav1/world_origin";
 
   sensor_msgs::PointCloud2 cloud_vis;
   pcl::toROSMsg(cloud_map, cloud_vis);

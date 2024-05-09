@@ -179,7 +179,7 @@ void renderDepth() {
 
   cv_bridge::CvImage out_msg;
   out_msg.header.stamp = last_odom_stamp;
-  out_msg.header.frame_id = "world";
+  out_msg.header.frame_id = "uav1/world_origin";
   out_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
   out_msg.image = depth_mat.clone();
   pub_depth.publish(out_msg.toImageMsg());

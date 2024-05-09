@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
 
   geometry_msgs::PoseStamped pose;
   pose.header.stamp = ros::Time::now();
-  pose.header.frame_id = "world";
+  pose.header.frame_id = "uav1/world_origin";
   pose.pose.orientation.w = 1.0;
 
   ROS_INFO("Triggering!");

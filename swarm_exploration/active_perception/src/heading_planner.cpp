@@ -310,7 +310,7 @@ double HeadingPlanner::calcInformationGain(const Eigen::Vector3d& pt, const doub
   // gain = gain * exp(-lambda_ * dist);
   // sensor_msgs::PointCloud2 msg;
   // pcl::toROSMsg(gain_pts, msg);
-  // msg.header.frame_id = "world";
+  // msg.header.frame_id = "uav1/world_origin";
   // visib_pub_.publish(msg);
 
   // ROS_WARN("gain %d is %lf, cost %lf secs", task_id, gain, (ros::Time::now() -
@@ -380,7 +380,7 @@ double HeadingPlanner::calcInfoGain(
   // gain = gain * exp(-lambda_ * dist);
   // sensor_msgs::PointCloud2 msg;
   // pcl::toROSMsg(gain_pts, msg);
-  // msg.header.frame_id = "world";
+  // msg.header.frame_id = "uav1/world_origin";
   // visib_pub_.publish(msg);
 
   // ROS_WARN("gain %d is %lf, cost %lf secs", task_id, gain, (ros::Time::now() -
@@ -417,7 +417,7 @@ void HeadingPlanner::calcFovAABB(const Eigen::Matrix3d& R_wc, const Eigen::Vecto
 
 void HeadingPlanner::visualizeBox(const Eigen::Vector3d& lb, const Eigen::Vector3d& ub) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::CUBE;
   mk.action = visualization_msgs::Marker::ADD;
@@ -504,7 +504,7 @@ void HeadingPlanner::setFrontier(const vector<vector<Eigen::Vector3d>>& frontier
   frontier_->width = frontier_->points.size();
   frontier_->height = 1;
   frontier_->is_dense = true;
-  frontier_->header.frame_id = "world";
+  frontier_->header.frame_id = "uav1/world_origin";
 
   ft_kdtree_.setInputCloud(frontier_);
 }
@@ -546,7 +546,7 @@ void HeadingPlanner::calcVisibFrontier(
   // visib_pts.width = visib_pts.points.size();
   // visib_pts.height = 1;
   // visib_pts.is_dense = true;
-  // visib_pts.header.frame_id = "world";
+  // visib_pts.header.frame_id = "uav1/world_origin";
 
   // // visualize to debug
   // sensor_msgs::PointCloud2 msg;

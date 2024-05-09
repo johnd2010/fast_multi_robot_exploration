@@ -54,7 +54,7 @@
     <param name="sdf_map/use_uniform_update" value="true"/>
 
     <param name="sdf_map/pose_type"     value="1"/>  
-    <param name="sdf_map/frame_id"      value="world"/>
+    <param name="sdf_map/frame_id"      value="uav1/world_origin"/>
 
   <!-- planning fsm -->
     <param name="fsm/flight_type" value="2" type="int"/>

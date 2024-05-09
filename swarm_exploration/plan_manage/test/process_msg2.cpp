@@ -25,7 +25,7 @@ visualization_msgs::Marker view_mk_;
 void drawLines(const vector<Eigen::Vector3d>& list1, const vector<Eigen::Vector3d>& list2,
     const double& line_width, const Eigen::Vector4d& color, const string& ns, const int& id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::LINE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -65,7 +65,7 @@ void drawLines(const vector<Eigen::Vector3d>& list1, const vector<Eigen::Vector3
 void drawSpheres(const vector<Eigen::Vector3d>& points, const double& resolution,
     const Eigen::Vector4d& color, const string& ns, const int& id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::SPHERE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;

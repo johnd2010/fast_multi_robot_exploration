@@ -72,7 +72,7 @@ double calcPathLength(const vector<Eigen::Vector3d>& path) {
 void displayTrajWithColor(
     const vector<Eigen::Vector3d>& path, double resolution, const Eigen::Vector4d& color, int id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::SPHERE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -124,7 +124,7 @@ void displayTrajWithColor(
 
 void drawFOV(const vector<Eigen::Vector3d>& list1, const vector<Eigen::Vector3d>& list2) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.id = 0;
   mk.ns = "current_pose";
@@ -171,7 +171,7 @@ void drawFOV(const vector<Eigen::Vector3d>& list1, const vector<Eigen::Vector3d>
 void drawCmd(const Eigen::Vector3d& pos, const Eigen::Vector3d& vec, const int& id,
     const Eigen::Vector4d& color) {
   visualization_msgs::Marker mk_state;
-  mk_state.header.frame_id = "world";
+  mk_state.header.frame_id = "uav1/world_origin";
   mk_state.header.stamp = ros::Time::now();
   mk_state.id = id;
   mk_state.type = visualization_msgs::Marker::ARROW;
@@ -576,7 +576,7 @@ int main(int argc, char** argv) {
   std::cout << end_time.toSec() << std::endl;
 
   cmd.header.stamp = ros::Time::now();
-  cmd.header.frame_id = "world";
+  cmd.header.frame_id = "uav1/world_origin";
   cmd.trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
   cmd.trajectory_id = traj_id_;
   cmd.position.x = -4.5;

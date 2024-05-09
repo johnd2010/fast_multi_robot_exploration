@@ -55,7 +55,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& msg) {
   pts2.width = pts2.points.size();
   pts2.height = 1;
   pts2.is_dense = true;
-  pts2.header.frame_id = "world";
+  pts2.header.frame_id = "uav1/world_origin";
 
   sensor_msgs::PointCloud2 cloud;
   pcl::toROSMsg(pts2, cloud);

@@ -24,7 +24,7 @@ void rcvPosCmdCallBack(const quadrotor_msgs::PositionCommand cmd) {
 void pubOdom() {
   nav_msgs::Odometry odom;
   odom.header.stamp = ros::Time::now();
-  odom.header.frame_id = "world";
+  odom.header.frame_id = "uav1/world_origin";
   odom.child_frame_id = std::to_string(drone_id_);
 
   if (rcv_cmd) {

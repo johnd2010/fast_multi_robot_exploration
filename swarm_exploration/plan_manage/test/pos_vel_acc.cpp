@@ -15,7 +15,7 @@ int pub_id;
 void displaySphereList(
     vector<Eigen::Vector3d> list, double resolution, Eigen::Vector4d color, int id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::SPHERE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;

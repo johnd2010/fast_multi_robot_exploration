@@ -31,7 +31,7 @@ double distance1;
 void displayLineList(const vector<Eigen::Vector3d>& list1, const vector<Eigen::Vector3d>& list2,
     double line_width, const Eigen::Vector4d& color, int id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::LINE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -70,7 +70,7 @@ void displayLineList(const vector<Eigen::Vector3d>& list1, const vector<Eigen::V
 void displayTrajWithColor(
     vector<Eigen::Vector3d> path, double resolution, Eigen::Vector4d color, int id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::SPHERE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -209,7 +209,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& msg) {
   pts->width = pts->points.size();
   pts->height = 1;
   pts->is_dense = true;
-  pts->header.frame_id = "world";
+  pts->header.frame_id = "uav1/world_origin";
 
   sensor_msgs::PointCloud2 cloud;
   pcl::toROSMsg(*pts, cloud);

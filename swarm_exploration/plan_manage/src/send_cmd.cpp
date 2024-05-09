@@ -22,7 +22,7 @@ ros::Publisher traj_pub, swarm_pos_cmd_pub, point_pub, vel_pub, acc_pub;
 void displayTrajWithColor(
     vector<Eigen::Vector3d> path, double resolution, Eigen::Vector4d color, int id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::SPHERE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;

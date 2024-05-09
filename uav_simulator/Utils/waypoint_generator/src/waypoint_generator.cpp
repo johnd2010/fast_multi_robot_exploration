@@ -89,7 +89,7 @@ void load_waypoints(ros::NodeHandle& nh, const ros::Time& time_base) {
 }
 
 void publish_waypoints() {
-  waypoints.header.frame_id = std::string("world");
+  waypoints.header.frame_id = std::string("uav1/world_origin");
   waypoints.header.stamp = ros::Time::now();
   pub1.publish(waypoints);
   geometry_msgs::PoseStamped init_pose;
@@ -103,7 +103,7 @@ void publish_waypoints() {
 void publish_waypoints_vis() {
   nav_msgs::Path wp_vis = waypoints;
   geometry_msgs::PoseArray poseArray;
-  poseArray.header.frame_id = std::string("world");
+  poseArray.header.frame_id = std::string("uav1/world_origin");
   poseArray.header.stamp = ros::Time::now();
 
   {

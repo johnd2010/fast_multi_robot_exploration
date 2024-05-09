@@ -32,7 +32,7 @@ vector<Eigen::Vector3d> executed_cmd_;
 void displayTrajWithColor(
     vector<Eigen::Vector3d> traj, double resolution, Eigen::Vector4d color, int id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::SPHERE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -66,7 +66,7 @@ void displayTrajWithColor(
 void drawCmd(const Eigen::Vector3d& pos, const Eigen::Vector3d& vec, const int& id,
     const Eigen::Vector4d& color) {
   visualization_msgs::Marker mk_state;
-  mk_state.header.frame_id = "world";
+  mk_state.header.frame_id = "uav1/world_origin";
   mk_state.header.stamp = ros::Time::now();
   mk_state.id = id;
   mk_state.type = visualization_msgs::Marker::ARROW;
@@ -146,7 +146,7 @@ void cmdCallback(const ros::TimerEvent& e) {
   bool status = local_traj_->evaluate(time_now, traj_cmd);
   if (status) {
     cmd.header.stamp = time_now;
-    cmd.header.frame_id = "world";
+    cmd.header.frame_id = "uav1/world_origin";
     cmd.trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
     cmd.trajectory_id = traj_cmd.id;
 

@@ -156,7 +156,7 @@ void MultiMapManager::stampTimerCallback(const ros::TimerEvent& e) {
   static int pub_id = 0;
 
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.ns = "own";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::CUBE_LIST;

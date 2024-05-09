@@ -172,7 +172,7 @@ void visualizeObj(int id) {
 
   /* ---------- rviz ---------- */
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::CUBE;
   mk.action = visualization_msgs::Marker::ADD;
@@ -192,7 +192,7 @@ void visualizeObj(int id) {
 
   /* ---------- pose ---------- */
   geometry_msgs::PoseStamped pose;
-  pose.header.frame_id = "world";
+  pose.header.frame_id = "uav1/world_origin";
   pose.header.seq = id;
   pose.pose.position.x = pos(0), pose.pose.position.y = pos(1), pose.pose.position.z = pos(2);
   pose.pose.orientation.w = 1.0;

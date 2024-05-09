@@ -56,7 +56,7 @@ PlanningVisualization::PlanningVisualization(ros::NodeHandle& nh) {
 void PlanningVisualization::fillBasicInfo(visualization_msgs::Marker& mk,
     const Eigen::Vector3d& scale, const Eigen::Vector4d& color, const string& ns, const int& id,
     const int& shape) {
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.id = id;
   mk.ns = ns;
@@ -262,7 +262,7 @@ void PlanningVisualization::displaySphereList(const vector<Eigen::Vector3d>& lis
   if (pubs_[pub_id].getNumSubscribers() == 0) return;
 
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::SPHERE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -300,7 +300,7 @@ void PlanningVisualization::displayCubeList(const vector<Eigen::Vector3d>& list,
   if (pubs_[pub_id].getNumSubscribers() == 0) return;
 
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::CUBE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -340,7 +340,7 @@ void PlanningVisualization::displayLineList(const vector<Eigen::Vector3d>& list1
   if (pubs_[pub_id].getNumSubscribers() == 0) return;
 
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::LINE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -612,7 +612,7 @@ void PlanningVisualization::drawVisibConstraint(
 void PlanningVisualization::drawViewConstraint(const ViewConstraint& vc) {
   if (vc.idx_ < 0) return;
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.id = 0;
   mk.type = visualization_msgs::Marker::ARROW;

@@ -17,7 +17,7 @@ bool have_odom;
 void displayPathWithColor(
     vector<Eigen::Vector3d> path, double resolution, Eigen::Vector4d color, int id) {
   visualization_msgs::Marker mk;
-  mk.header.frame_id = "world";
+  mk.header.frame_id = "uav1/world_origin";
   mk.header.stamp = ros::Time::now();
   mk.type = visualization_msgs::Marker::SPHERE_LIST;
   mk.action = visualization_msgs::Marker::DELETE;
@@ -53,7 +53,7 @@ void displayPathWithColor(
 
 void drawState(Eigen::Vector3d pos, Eigen::Vector3d vec, int id, Eigen::Vector4d color) {
   visualization_msgs::Marker mk_state;
-  mk_state.header.frame_id = "world";
+  mk_state.header.frame_id = "uav1/world_origin";
   mk_state.header.stamp = ros::Time::now();
   mk_state.id = id;
   mk_state.type = visualization_msgs::Marker::ARROW;
