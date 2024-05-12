@@ -10,7 +10,7 @@ Panels:
         - /Maps1/occupied_all11/Autocompute Value Bounds1
         - /PointCloud21
       Splitter Ratio: 0.6411764621734619
-    Tree Height: 379
+    Tree Height: 441
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -799,7 +799,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 19.78920555114746
+      Distance: 31.13869857788086
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -807,8 +807,8 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -2.8050789833068848
-        Y: -4.382363796234131
+        X: 6.2376389503479
+        Y: -2.053739070892334
         Z: 0
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
@@ -817,7 +817,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
-      Yaw: 2.9335992336273193
+      Yaw: 4.723607540130615
     Saved:
       - Class: rviz/ThirdPersonFollower
         Distance: 17.48538589477539
@@ -936,4 +936,4 @@ Window Geometry:
     collapsed: true
   Width: 1440
   X: 150
-  Y: 84
+  Y: 47

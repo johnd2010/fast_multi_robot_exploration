@@ -68,6 +68,7 @@ void FameExplorationFSM::init(ros::NodeHandle& nh) {
   heartbit_timer_ = nh.createTimer(ros::Duration(1.0), &FameExplorationFSM::heartbitCallback, this);
 
   odom_sub_ = nh.subscribe("/odom_world", 1, &FameExplorationFSM::odometryCallback, this);
+  idle_sub = nh.subscribe("/uav1/octomap_planner/diagnostics", 1, &FameExplorationFSM::diagnosticCallback, this);
 
   replan_pub_ = nh.advertise<std_msgs::Empty>("/planning/replan", 10);
   new_pub_ = nh.advertise<std_msgs::Empty>("/planning/new", 10);
@@ -227,12 +228,12 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
         fame_data_->static_state_ = true;
         ROS_WARN_THROTTLE(1., "Plan fail (drone %d)", getId());
         // Check if we need to send a message
-        if (num_fail_ > 10) {
-          sendEmergencyMsg(true);
-          num_fail_ = 0;
-        } else {
-          ++num_fail_;
-        }
+        // if (num_fail_ > 1000000000000) {
+        //   sendEmergencyMsg(true);
+        //   num_fail_ = 0;
+        // } else {
+        //   ++num_fail_;
+        // }
 
       } else if (res == NO_GRID) {
         fame_data_->static_state_ = true;
@@ -270,6 +271,8 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       auto tn = ros::Time::now();
       // Check whether replan is needed
       // ROS_WARN("Vector: x=%f, y=%f, z=%f", expl_manager_->ed_->next_pos_.x(), expl_manager_->ed_->next_pos_.y(), expl_manager_->ed_->next_pos_.z());
+      if (fame_data_->idle)
+      {
       geometry_msgs::Pose pose =  mrsFly(expl_manager_->ed_->next_pos_);
       pose_pub_.publish(pose);
 
@@ -329,6 +332,7 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       }
 
       break;
+      }
     }
   }
 }
@@ -341,11 +345,13 @@ int FameExplorationFSM::callExplorationPlanner() {
     res = expl_manager_->planTrajToView(fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_,
         fame_data_->start_yaw_, expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
     fame_data_->avoid_collision_ = false;
+    // ROS_WARN("res at planTrajToView %d",res);
   } else {  // Do full planning normally
     res = expl_manager_->planExploreMotion(
         fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_, fame_data_->start_yaw_);
+      // ROS_WARN("res at planExploreMotion %d",res);
   }
-
+  // ROS_WARN("res at 350 %d",res);
   if (res == SUCCEED) {
     auto info = &planner_manager_->local_data_;
     info->start_time_ = (ros::Time::now() - time_r).toSec() > 0 ? ros::Time::now() : time_r;
@@ -382,6 +388,7 @@ int FameExplorationFSM::callExplorationPlanner() {
     bspline.yaw_dt = info->yaw_traj_.getKnotSpan();
     fame_data_->newest_traj_ = bspline;
   }
+  // ROS_WARN("res at 387 %d",res);
   return res;
 }
 
@@ -615,6 +622,10 @@ void FameExplorationFSM::safetyCallback(const ros::TimerEvent& e) {
       time_check = ros::Time::now();
     }
   }
+}
+
+void FameExplorationFSM::diagnosticCallback(const mrs_modules_msgs::OctomapPlannerDiagnostics& msg) {
+  fame_data_->idle = msg.idle;
 }
 
 void FameExplorationFSM::odometryCallback(const nav_msgs::OdometryConstPtr& msg) {

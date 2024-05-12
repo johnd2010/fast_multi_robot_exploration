@@ -120,18 +120,7 @@
     <param name="perception_utils/vis_dist" value="10.0" type="double"/>
   </node>
 
-  
-  <include file="$(find exploration_manager)/launch/simulator_light.xml" if="$(eval arg('simulation') and not arg('vulkan_renderer'))">
-    <arg name="drone_id" value="$(arg drone_id)"/>
-    <arg name="drone_num" value="$(arg drone_num)"/>
-    <arg name="init_x"   value="$(arg init_x)"/>
-    <arg name="init_y"   value="$(arg init_y)"/>
-    <arg name="init_z"   value="$(arg init_z)"/> 
-    <arg name="map_size_x" value="$(arg map_size_x)"/>
-    <arg name="map_size_y" value="$(arg map_size_y)"/>
-    <arg name="map_size_z" value="$(arg map_size_z)"/>
-    <arg name="odometry_topic" value="$(arg odometry_topic)" />
-  </include>
+
 
   <!-- lcm communication -->
   <!-- <include file="$(find inf_uwb_ros)/launch/uwb_node_sim.launch" if="$(arg simulation)">

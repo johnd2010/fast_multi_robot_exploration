@@ -14,7 +14,7 @@ using namespace std;
 namespace fast_planner {
 struct FSMData {
   // FSM data
-  bool trigger_, have_odom_, static_state_;
+  bool trigger_, have_odom_, static_state_, idle;
   vector<string> state_str_;
 
   Eigen::Vector3d odom_pos_, odom_vel_;  // odometry state
@@ -31,6 +31,7 @@ struct FSMData {
   ros::Time last_check_frontier_time_;
 
   Eigen::Vector3d start_pos_;
+
 };
 
 struct FSMParam {

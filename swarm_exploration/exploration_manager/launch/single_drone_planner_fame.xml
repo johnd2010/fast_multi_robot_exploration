@@ -123,7 +123,7 @@
     <param name="sdf_map/box_max_y" value="$(arg box_max_y)" type="double"/>
     <param name="sdf_map/box_max_z" value="$(arg box_max_z)" type="double"/>
     -->
-    <rosparam command="load" file="$(find exploration_manager)/config/maps/$(arg model).yaml" />
+    <rosparam command="load" file="$(find  shepherding)/triggers/Long_run_multi/config/explorer.yaml" />
     
     <param name="sdf_map/no_drone_1" value="false" type="bool"/>
 
