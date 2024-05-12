@@ -90,6 +90,7 @@
     <remap from="/sdf_map/depth_cloud" to="/sdf_map/depth_cloud_$(arg drone_id)"/>
     
 
+    <param name="sdf_map/resolution"      value="0.5" /> 
     <!--
     <param name="sdf_map/resolution"      value="$(arg map_resolution)" /> 
     <param name="sdf_map/map_size_x"   value="$(arg map_size_x)" /> 
@@ -103,13 +104,13 @@
     <param name="sdf_map/ground_height"        value="-1.0"/>
     <param name="sdf_map/default_dist"        value="0.5"/>
     
-    <param name="sdf_map/p_hit"  value="0.65"/>
-    <param name="sdf_map/p_miss" value="0.35"/>
+    <param name="sdf_map/p_hit"  value="1"/>
+    <param name="sdf_map/p_miss" value="0"/>
     <param name="sdf_map/p_min"  value="0.12"/>
     <param name="sdf_map/p_max"  value="0.90"/>
     <param name="sdf_map/p_occ"  value="0.80"/>
-    <param name="sdf_map/min_ray_length" value="0.5"/>
-    <param name="sdf_map/max_ray_length" value="4.5"/>
+    <param name="sdf_map/min_ray_length" value="0.0"/>
+    <param name="sdf_map/max_ray_length" value="10.0"/>
     <param name="sdf_map/virtual_ceil_height"   value="-10"/>
     <param name="sdf_map/optimistic" value="true" type="bool"/>
     <param name="sdf_map/signed_dist" value="false" type="bool"/>
@@ -131,7 +132,7 @@
     <param name="map_ros/fx" value="$(arg fx)"/>
     <param name="map_ros/fy" value="$(arg fy)"/>
     <param name="map_ros/depth_filter_maxdist"   value="4.6"/>
-    <param name="map_ros/depth_filter_mindist"   value="0.2"/>
+    <param name="map_ros/depth_filter_mindist"   value="-2"/>
     <param name="map_ros/depth_filter_margin"    value="2"/>
     <param name="map_ros/k_depth_scaling_factor" value="1000.0"/>
     <param name="map_ros/skip_pixel" value="2"/>
@@ -189,8 +190,9 @@
     <param name="exploration/drone_id" value="$(arg drone_id)" type="int"/>
     <param name="exploration/init_plan_num" value="2" type="int"/>
     
-    <param name="frontier/cluster_min" value="100" type="int"/>
-    <param name="frontier/cluster_size_xy" value="2.0" type="double"/>
+    <param name="frontier/cluster_min" value="10" type="int"/>
+    <param name="frontier/cluster_size_xy" value="5.0" type="double"/>  
+    <!-- <param name="frontier/cluster_size_xy" value="10.0" type="double"/>  Changed this to get more frontiers -->
     <param name="frontier/cluster_size_z" value="10.0" type="double"/>
     <param name="frontier/min_candidate_dist" value="0.5" type="double"/>
     <param name="frontier/min_candidate_clearance" value="0.41" type="double"/>
@@ -290,7 +292,7 @@
     <param name="search/w_time" value="10.0" type="double"/>
     <param name="search/horizon" value="5.0" type="double"/>
     <param name="search/lambda_heu" value="10.0" type="double"/>
-    <param name="search/resolution_astar" value="0.025" type="double"/>
+    <param name="search/resolution_astar" value="1" type="double"/>
     <param name="search/time_resolution" value="0.8" type="double"/>
     <param name="search/margin" value="0.2" type="double"/>
     <param name="search/allocate_num" value="100000" type="int"/>
@@ -298,7 +300,7 @@
     <param name="search/optimistic" value="false" type="bool"/>
 
     <param name="astar/lambda_heu" value="10000.0" type="double"/>
-    <param name="astar/resolution_astar" value="1" type="double"/>
+    <param name="astar/resolution_astar" value="10" type="double"/>
     <param name="astar/allocate_num" value="1000000" type="int"/>
     <param name="astar/max_search_time" value="0.001" type="double"/>
 

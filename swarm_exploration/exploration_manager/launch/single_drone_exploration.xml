@@ -3,10 +3,10 @@
     <arg name="model" default="forest_rumburk_large"/>
     <arg name="log_folder" default="$(find exploration_manager)/exp_logs"/> 
   
-    <arg name="box_min_x" default="-7"/>
+    <arg name="box_min_x" default="-10"/>
     <arg name="box_min_y" default="-15"/>
-    <arg name="box_min_z" default="0"/> 
-    <arg name="box_max_x" default="7"/>
+    <arg name="box_min_z" default="-10"/> 
+    <arg name="box_max_x" default="10"/>
     <arg name="box_max_y" default="15"/>
     <arg name="box_max_z" default="10"/>
 
@@ -79,7 +79,7 @@
     <arg name="fy" value="$(arg fy)"/>
 
     <!-- maximum velocity and acceleration the drone will reach -->
-    <arg name="max_vel" value="1.5" />
+    <arg name="max_vel" value="1.0" />
     <arg name="max_acc" value="1.0" />
     <!-- <arg name="max_vel" value="1.0" />
     <arg name="max_acc" value="0.8" /> -->
