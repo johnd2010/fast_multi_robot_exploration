@@ -31,7 +31,8 @@
   </node> -->
   <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find exploration_manager)/config/swarm.rviz" />
 
-<include file="$(find exploration_manager)/launch/single_drone_exploration.xml" if="$(eval arg('drone_num') >= 1)">
+<include ns="uav1" file="$(find exploration_manager)/launch/single_drone_exploration.xml" if="$(eval arg('drone_num') >= 1)">
+    <arg name="drone_name" value="uav1"/>
     <arg name="drone_id" value="1"/>
     <arg name="init_x"   value="0"/>
     <arg name="init_y"   value="0"/>

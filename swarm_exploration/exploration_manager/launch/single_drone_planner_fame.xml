@@ -2,6 +2,8 @@
   <arg name="drone_id"/>
   <arg name="drone_num"/>
   <arg name="model"/>
+  <arg name="drone_name" default="uav1"/>
+
 
   <!-- Debugging -->
   <arg name="launch_prefix" default=""/> <!-- xterm -T 'Agent $(arg drone_id)' -e -->
@@ -22,6 +24,7 @@
   <arg name="sensor_pose_topic"/>
   <arg name="depth_topic"/>
   <arg name="cloud_topic"/>
+  <arg name="diagnostics"/>
 
   <arg name="cx"/>
   <arg name="cy"/>
@@ -47,6 +50,9 @@
     <remap from ="/map_ros/pose"   to = "$(arg sensor_pose_topic)"/> 
     <remap from ="/map_ros/depth" to = "$(arg depth_topic)"/>
     <remap from ="/map_ros/cloud" to="$(arg cloud_topic)"/>
+
+    <remap from ="/diagnostics" to="$(arg diagnostics)"/>
+    <remap from ="/fame/explore_target" to="/$(arg drone_name)/fame/explore_target"/>
 
     <remap from="/planning/replan" to="/planning/replan_$(arg drone_id)" />
     <remap from="/planning/new" to="/planning/new_$(arg drone_id)" />
@@ -142,7 +148,7 @@
     <param name="map_ros/show_occ_time"  value="false"/>
     <param name="map_ros/show_esdf_time" value="false"/>
     <param name="map_ros/show_all_map" value="true"/>
-    <param name="map_ros/frame_id"      value="uav1/world_origin"/>
+    <param name="map_ros/frame_id"      value="$(arg drone_name)/world_origin"/>
     
     <!-- Logging -->
     <param name="multi_map_manager/log_folder" value="$(arg log_folder)"/>

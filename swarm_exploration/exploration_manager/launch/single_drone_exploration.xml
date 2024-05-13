@@ -11,6 +11,7 @@
     <arg name="box_max_z" default="10"/>
 
     <arg name="drone_id" default="1"/>
+    <arg name="drone_name" default="uav1"/>
     <arg name="drone_num" default="1"/> <!-- to determine salesman number, etc -->
     <arg name="init_x" default="0"/>
     <arg name="init_y" default="0"/>
@@ -21,9 +22,10 @@
     <arg name="odom_prefix" default="odom"/>
     <arg name="simulation" default="false"/>
     <arg name="vulkan_renderer" default="false"/>
-    <arg name="odometry_topic" default="/uav1/estimation_manager/odom_world"/>
-    <!-- <arg name="odometry_topic" default="/pcl_render_node/odom_$(arg drone_id)"/> -->
-    <arg name="sensor_pose_topic" default="/uav1/pose/cam_to_world"/> 
+    <arg name="odometry_topic" default="/$(arg drone_name)/estimation_manager/odom_world"/>
+    <arg name="diagnostics_topic" default="/$(arg drone_name)/octomap_planner/diagnostics"/>
+    <!-- <arg name="odometry_topic" default="/pcl_render_node/odom_$(arg drone_name)"/> -->
+    <arg name="sensor_pose_topic" default="/$(arg drone_name)/pose/cam_to_world"/> 
     <arg name="depth_topic" default="/pcl_render_node/depth_$(arg drone_id)"/> 
     <arg name="cx" default="324.0879821777344"/>
     <arg name="cy" default="239.10362243652344"/>
@@ -44,7 +46,9 @@
 
     <arg name="drone_id" value="$(arg drone_id)"/>
     <arg name="drone_num" value="$(arg drone_num)"/>
+    <arg name="drone_name" value="$(arg drone_name)"/>
     <arg name="model" value="$(arg model)"/>
+    <arg name="diagnostics" value="$(arg diagnostics_topic)"/>
     
     <arg name="map_size_x" value="$(arg map_size_x)"/>
     <arg name="map_size_y" value="$(arg map_size_y)"/>
@@ -68,8 +72,7 @@
     <!-- subscribe ONLY TO ONE of the two topics -->
     <arg name="depth_topic" value="$(arg depth_topic)"/> 
 
-    <!-- <arg name="cloud_topic" value="/uav1/pcl_filter_ouster/points_processed_world"/> -->
-    <arg name="cloud_topic" value="/uav1/octomap_global_vis/octomap_point_cloud_centers"/>
+    <arg name="cloud_topic" value="/$(arg drone_name)/octomap_global_vis/octomap_point_cloud_centers"/>
 
 
     <!-- intrinsic params of the depth camera -->
@@ -96,7 +99,7 @@
 
   <!-- trajectory server -->
   <node pkg="plan_manage" name="traj_server_$(arg drone_id)" type="traj_server" output="screen">
-    <remap from="/odom_world" to="/uav1/estimation_manager/odom_world"/>
+    <remap from="/odom_world" to="/$(arg drone_name)/estimation_manager/odom_world"/>
 
     <remap from="/planning/bspline" to="/planning/bspline_$(arg drone_id)" />
     <remap from="/planning/replan" to="/planning/replan_$(arg drone_id)" />
