@@ -1,5 +1,5 @@
 PROJECT(local_sensing_node)
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.13)
 SET(CMAKE_BUILD_TYPE Release) # Release, RelWithDebInfo
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 

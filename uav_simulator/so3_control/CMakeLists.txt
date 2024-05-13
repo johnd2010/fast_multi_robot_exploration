@@ -42,7 +42,7 @@
 #rosbuild_add_link_flags(so3_control_nodelet -Wl,--as-needed)
 
 #----------------------------------
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.13)
 project(so3_control)
 
 ## Find catkin macros and libraries

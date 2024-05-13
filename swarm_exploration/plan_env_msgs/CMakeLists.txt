@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.13)
 project(plan_env_msgs)
 
 set(CMAKE_BUILD_TYPE "Release")
