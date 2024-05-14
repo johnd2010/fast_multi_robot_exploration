@@ -228,7 +228,7 @@ void FastPlannerManager::planExploreTraj(const vector<Eigen::Vector3d>& tour,
   vector<Vector3d> points, boundary_deri;
   double duration = init_traj.getTotalTime();
   if (duration < 1e-3) {
-    ROS_ERROR("Trajectory duration is 0!");
+    // ROS_ERROR("Trajectory duration is 0!");
     return;
   }
   int seg_num = init_traj.getLength() / pp_.ctrl_pt_dist;

@@ -219,7 +219,7 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       replan_pub_.publish(std_msgs::Empty());
       int res = callExplorationPlanner();
       if (res == SUCCEED) {
-        transitState(PUB_TRAJ, "FSM");
+        transitState(EXEC_TRAJ, "FSM");
         // Emergency
         num_fail_ = 0;
         sendEmergencyMsg(false);
@@ -268,6 +268,8 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
     }
 
     case EXEC_TRAJ: {
+      fame_data_->static_state_ = false;
+      fame_data_->newest_traj_.drone_id = expl_manager_->ep_->drone_id_;
       auto tn = ros::Time::now();
       // Check whether replan is needed
       // ROS_WARN("Vector: x=%f, y=%f, z=%f", expl_manager_->ed_->next_pos_.x(), expl_manager_->ed_->next_pos_.y(), expl_manager_->ed_->next_pos_.z());
@@ -352,42 +354,42 @@ int FameExplorationFSM::callExplorationPlanner() {
       ROS_WARN("res at planExploreMotion %d",res);
   }
   // ROS_WARN("res at 350 %d",res);
-  if (res == SUCCEED) {
-    auto info = &planner_manager_->local_data_;
-    info->start_time_ = (ros::Time::now() - time_r).toSec() > 0 ? ros::Time::now() : time_r;
+  // if (res == SUCCEED) {
+  //   auto info = &planner_manager_->local_data_;
+  //   info->start_time_ = (ros::Time::now() - time_r).toSec() > 0 ? ros::Time::now() : time_r;
 
-    bspline::Bspline bspline;
-    bspline.order = planner_manager_->pp_.bspline_degree_;
-    bspline.start_time = info->start_time_;
-    bspline.traj_id = info->traj_id_;
-    Eigen::MatrixXd pos_pts = info->position_traj_.getControlPoint();
+  //   bspline::Bspline bspline;
+  //   bspline.order = planner_manager_->pp_.bspline_degree_;
+  //   bspline.start_time = info->start_time_;
+  //   bspline.traj_id = info->traj_id_;
+  //   Eigen::MatrixXd pos_pts = info->position_traj_.getControlPoint();
     
 
 
-    for (int i = 0; i < pos_pts.rows(); ++i) {
-      geometry_msgs::Point pt;
-      mrs_msgs::Reference pose;
-      pose.position.x = pos_pts(i, 0);
-      pose.position.y = pos_pts(i, 1);
-      pose.position.z = pos_pts(i, 2);
-      pose.heading    = 0;
-      pt.x = pos_pts(i, 0);
-      pt.y = pos_pts(i, 1);
-      pt.z = pos_pts(i, 2);
-      bspline.pos_pts.push_back(pt);
-    }
-    Eigen::VectorXd knots = info->position_traj_.getKnot();
-    for (int i = 0; i < knots.rows(); ++i) {
-      bspline.knots.push_back(knots(i));
-    }
-    Eigen::MatrixXd yaw_pts = info->yaw_traj_.getControlPoint();
-    for (int i = 0; i < yaw_pts.rows(); ++i) {
-      double yaw = yaw_pts(i, 0);
-      bspline.yaw_pts.push_back(yaw);
-    }
-    bspline.yaw_dt = info->yaw_traj_.getKnotSpan();
-    fame_data_->newest_traj_ = bspline;
-  }
+  //   for (int i = 0; i < pos_pts.rows(); ++i) {
+  //     geometry_msgs::Point pt;
+  //     mrs_msgs::Reference pose;
+  //     pose.position.x = pos_pts(i, 0);
+  //     pose.position.y = pos_pts(i, 1);
+  //     pose.position.z = pos_pts(i, 2);
+  //     pose.heading    = 0;
+  //     pt.x = pos_pts(i, 0);
+  //     pt.y = pos_pts(i, 1);
+  //     pt.z = pos_pts(i, 2);
+  //     bspline.pos_pts.push_back(pt);
+  //   }
+  //   Eigen::VectorXd knots = info->position_traj_.getKnot();
+  //   for (int i = 0; i < knots.rows(); ++i) {
+  //     bspline.knots.push_back(knots(i));
+  //   }
+  //   Eigen::MatrixXd yaw_pts = info->yaw_traj_.getControlPoint();
+  //   for (int i = 0; i < yaw_pts.rows(); ++i) {
+  //     double yaw = yaw_pts(i, 0);
+  //     bspline.yaw_pts.push_back(yaw);
+  //   }
+  //   bspline.yaw_dt = info->yaw_traj_.getKnotSpan();
+  //   fame_data_->newest_traj_ = bspline;
+  // }
   // ROS_WARN("res at 387 %d",res);
   return res;
 }
