@@ -68,14 +68,14 @@ void FameExplorationFSM::init(ros::NodeHandle& nh) {
   heartbit_timer_ = nh.createTimer(ros::Duration(1.0), &FameExplorationFSM::heartbitCallback, this);
 
   odom_sub_ = nh.subscribe("/odom_world", 1, &FameExplorationFSM::odometryCallback, this);
-  idle_sub = nh.subscribe("/uav1/octomap_planner/diagnostics", 1, &FameExplorationFSM::diagnosticCallback, this);
+  idle_sub = nh.subscribe("/diagnostics", 1, &FameExplorationFSM::diagnosticCallback, this);
 
   replan_pub_ = nh.advertise<std_msgs::Empty>("/planning/replan", 10);
   new_pub_ = nh.advertise<std_msgs::Empty>("/planning/new", 10);
   bspline_pub_ = nh.advertise<bspline::Bspline>("/planning/bspline", 10);
   stop_pub_ = nh.advertise<std_msgs::Int32>("/stop", 1000);
   heartbit_pub_ = nh.advertise<std_msgs::Empty>("/heartbit", 100);
-  pose_pub_ = nh.advertise<geometry_msgs::Pose>("/uav1/fame/explore_target", 10);
+  pose_pub_ = nh.advertise<geometry_msgs::Pose>("/fame/explore_target", 10);
 
 
   emergency_handler_pub_ = nh.advertise<std_msgs::Bool>("/trigger_emergency", 10);
@@ -345,11 +345,11 @@ int FameExplorationFSM::callExplorationPlanner() {
     res = expl_manager_->planTrajToView(fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_,
         fame_data_->start_yaw_, expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
     fame_data_->avoid_collision_ = false;
-    // ROS_WARN("res at planTrajToView %d",res);
+    ROS_WARN("res at planTrajToView %d",res);
   } else {  // Do full planning normally
     res = expl_manager_->planExploreMotion(
         fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_, fame_data_->start_yaw_);
-      // ROS_WARN("res at planExploreMotion %d",res);
+      ROS_WARN("res at planExploreMotion %d",res);
   }
   // ROS_WARN("res at 350 %d",res);
   if (res == SUCCEED) {

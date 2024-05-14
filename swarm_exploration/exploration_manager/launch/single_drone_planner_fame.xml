@@ -170,7 +170,7 @@
     <param name="fsm/pair_opt_interval" value="0.5" type="double"/>
 
     <param name="partitioning/min_unknown" value="4000" type="int"/>;
-    <param name="partitioning/min_frontier" value="100" type="int"/>;
+    <param name="partitioning/min_frontier" value="10" type="int"/>;
     <param name="partitioning/min_free" value="3000" type="int"/>;
     <param name="partitioning/consistent_cost" value="-5" type="double"/>;
     <param name="partitioning/consistent_cost2" value="8" type="double"/>;
@@ -245,8 +245,8 @@
     <param name="collab_assigner/active" value="$(arg active_collaboration)" type="bool"/>
     
     <!-- Explorer parameters -->
-    <param name="explorer/ftr_max_distance" value="6.0" type="double"/>
-    <param name="explorer/max_ang_dist" value="$(eval 30.0 * 3.1415926 / 180.0)" type="double"/>
+    <param name="explorer/ftr_max_distance" value="10.0" type="double"/>
+    <param name="explorer/max_ang_dist" value="$(eval 360 * 3.1415926 / 180.0)" type="double"/>
     <param name="explorer/label_penalty" value="0.0" type="double"/>
     <param name="explorer/w_distance" value="0.0" type="double"/>
     <param name="explorer/w_direction" value="10.0" type="double"/>

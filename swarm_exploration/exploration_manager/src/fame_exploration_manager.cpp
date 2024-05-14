@@ -155,10 +155,12 @@ int FameExplorationManager::planExploreMotion(
     const Vector3d& pos, const Vector3d& vel, const Vector3d& acc, const Vector3d& yaw) {
   ros::Time t1 = ros::Time::now();
   auto t2 = t1;
+  ROS_WARN("inside planexploremotion");
 
   std::cout << "start pos: " << pos.transpose() << ", vel: " << vel.transpose()
             << ", acc: " << acc.transpose() << std::endl;
 
+  
   Vector3d next_pos;
   double next_yaw;
 
@@ -171,13 +173,15 @@ int FameExplorationManager::planExploreMotion(
   auto end_time = chrono::high_resolution_clock::now();
   int elapsed_time = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
   ROS_INFO_STREAM("Time to assign role: " << elapsed_time << " ms");
-  ROS_INFO("Current role: %s", roleToString(role_).c_str());
+  ROS_WARN("Current role: %s", roleToString(role_).c_str());
 
   bool success;
   if (role_ == ROLE::EXPLORER) {
     success = explorerPlan(pos, vel, yaw, next_pos, next_yaw);
+    ROS_WARN("RES Explorer %d",success);
   } else if (role_ == ROLE::GARBAGE_COLLECTOR) {
     success = collectorPlan(pos, vel, yaw, next_pos, next_yaw);
+    ROS_WARN("RES Collector %d",success);
   }
 
   // If we haven't found a goal, then get the first viewpoint (this happens
@@ -426,9 +430,11 @@ bool FameExplorationManager::explorerPlan(const Vector3d& pos, const Vector3d& v
     const Vector3d& yaw, Vector3d& next_pos, double& next_yaw) {
 
   // If don't have frontiers in front, then go the closest frontier
+  bool res;
   if (ed_->infront_frontiers_.empty()) {
-    // ROS_ERROR("No frontal frontiers - back to greedy");
-    return findPathClosestFrontier(pos, vel, yaw, next_pos, next_yaw);
+    res = findPathClosestFrontier(pos, vel, yaw, next_pos, next_yaw);
+    ROS_WARN("No frontal frontiers - back to greedy, Res = %d",res);
+    return res;
   }
 
   // Iterate over frontal frontiers
@@ -469,7 +475,7 @@ bool FameExplorationManager::explorerPlan(const Vector3d& pos, const Vector3d& v
       std::cout << std::endl;
     }
 
-    return distance_cost + angular_cost + label_cost + formation_cost + previous_goal_cost;
+    return distance_cost + label_cost + formation_cost + previous_goal_cost;
   };
 
   double min_cost = std::numeric_limits<double>::max();
@@ -514,16 +520,9 @@ bool FameExplorationManager::explorerPlan(const Vector3d& pos, const Vector3d& v
       found_goal = true;
     }
   }
-
+  ROS_WARN("frontiers exist- Res = %d",found_goal);
   return found_goal;
 
-  // If we haven't found a goal, then go to greedy approach
-  // if (!found_goal) {
-  //   //ROS_ERROR("Goal not found - back to greedy");
-  //   return findPathClosestFrontier(pos, vel, yaw, next_pos, next_yaw);
-  // } else {
-  //   return true;
-  // }
 }
 
 bool FameExplorationManager::findPathClosestFrontier(const Vector3d& pos, const Vector3d& vel,
@@ -667,6 +666,7 @@ bool FameExplorationManager::collectorPlan(const Vector3d& pos, const Vector3d& 
   if (!findTourOfTrails(pos, vel, yaw, next_pos, next_yaw)) {
     return greedyPlan(pos, vel, yaw, next_pos, next_yaw);
   } else {
+    ROS_WARN("Tour of trails worked");
     return true;
   }
 
@@ -766,14 +766,17 @@ bool FameExplorationManager::greedyPlan(const Vector3d& pos, const Vector3d& vel
 
     // Check that the position is valid
     if (!isPositionReachable(pos, vp_position)) {
+      ROS_WARN(" is position reachable: %d\n", isPositionReachable(pos, vp_position));
       continue;
     }
 
     // Calculate path from current position to viewpoint
     double path_length;
     if (!ViewNode::validPathExists(pos, vp_position, path_length)) {
+      ROS_WARN(" is path existing: %d\n", ViewNode::validPathExists(pos, vp_position, path_length));
       continue;
     }
+    ROS_WARN("The value of path_length is: %f\n", path_length);
     double time_to_dest = collector_params_->w_distance * path_length / ViewNode::vm_;
 
     // Calculate velocity change
@@ -1150,6 +1153,7 @@ bool FameExplorationManager::findTourOfTrails(const Vector3d& cur_pos,
     const Eigen::Vector3d& cur_yaw, const Vector3d& cur_vel, Eigen::Vector3d& next_pos,
     double& next_yaw) {
   // 1. Get all trails within an area
+  
   list<Frontier> close_by_trails;
   frontier_finder_->getTrailCentroidsAroundPosition(
       close_by_trails, cur_pos, collector_params_->ftr_max_distance);

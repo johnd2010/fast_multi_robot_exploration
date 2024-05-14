@@ -621,17 +621,7 @@ bool FrontierFinder::isFrontierInFront(const Eigen::Vector3d& ftr_pos, const Eig
   // Check distance
   if (diff_pos.norm() > max_dist) {
     return false;
-  } else if (vel.norm() > min_norm_vel) {
-    // Check angular distance
-    if (acos(vel.head(2).normalized().dot(diff_pos.normalized())) > max_ang_dist) {
-      return false;
-    }
-  } else {
-    Eigen::Vector2d yaw_dir(cos(yaw), sin(yaw));
-    if (acos(yaw_dir.dot(diff_pos.normalized())) > max_ang_dist) {
-      return false;
-    }
-  }
+  } 
 
   return true;
 }
