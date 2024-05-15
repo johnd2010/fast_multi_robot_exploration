@@ -72,7 +72,6 @@ void FameExplorationFSM::init(ros::NodeHandle& nh) {
 
   replan_pub_ = nh.advertise<std_msgs::Empty>("/planning/replan", 10);
   new_pub_ = nh.advertise<std_msgs::Empty>("/planning/new", 10);
-  bspline_pub_ = nh.advertise<bspline::Bspline>("/planning/bspline", 10);
   stop_pub_ = nh.advertise<std_msgs::Int32>("/stop", 1000);
   heartbit_pub_ = nh.advertise<std_msgs::Empty>("/heartbit", 100);
   pose_pub_ = nh.advertise<geometry_msgs::Pose>("/fame/explore_target", 10);
@@ -98,11 +97,10 @@ void FameExplorationFSM::init(ros::NodeHandle& nh) {
   opt_res_sub_ = nh.subscribe("/swarm_expl/pair_opt_res_recv", 100,
       &FameExplorationFSM::optResMsgCallback, this, ros::TransportHints().tcpNoDelay());
 
-  swarm_traj_pub_ = nh.advertise<bspline::Bspline>("/planning/swarm_traj_send", 100);
-  swarm_traj_sub_ =
-      nh.subscribe("/planning/swarm_traj_recv", 100, &FameExplorationFSM::swarmTrajCallback, this);
-  swarm_traj_timer_ =
-      nh.createTimer(ros::Duration(0.1), &FameExplorationFSM::swarmTrajTimerCallback, this);
+  // swarm_traj_sub_ =
+  //     nh.subscribe("/planning/swarm_traj_recv", 100, &FameExplorationFSM::swarmTrajCallback, this);
+  // swarm_traj_timer_ =
+  //     nh.createTimer(ros::Duration(0.1), &FameExplorationFSM::swarmTrajTimerCallback, this);
 
   hgrid_pub_ = nh.advertise<exploration_manager::HGrid>("/swarm_expl/hgrid_send", 10);
   grid_tour_pub_ = nh.advertise<exploration_manager::GridTour>("/swarm_expl/grid_tour_send", 10);
@@ -198,23 +196,23 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
     }
 
     case PLAN_TRAJ: {
-      if (fame_data_->static_state_) {
+      // if (fame_data_->static_state_) {
         // Plan from static state (hover)
         fame_data_->start_pt_ = fame_data_->odom_pos_;
         fame_data_->start_vel_ = fame_data_->odom_vel_;
         fame_data_->start_acc_.setZero();
         fame_data_->start_yaw_ << fame_data_->odom_yaw_, 0, 0;
-      } else {
-        // Replan from non-static state, starting from 'replan_time' seconds later
-        LocalTrajData* info = &planner_manager_->local_data_;
-        double t_r = (ros::Time::now() - info->start_time_).toSec() + fame_params_->replan_time_;
-        fame_data_->start_pt_ = info->position_traj_.evaluateDeBoorT(t_r);
-        fame_data_->start_vel_ = info->velocity_traj_.evaluateDeBoorT(t_r);
-        fame_data_->start_acc_ = info->acceleration_traj_.evaluateDeBoorT(t_r);
-        fame_data_->start_yaw_(0) = info->yaw_traj_.evaluateDeBoorT(t_r)[0];
-        fame_data_->start_yaw_(1) = info->yawdot_traj_.evaluateDeBoorT(t_r)[0];
-        fame_data_->start_yaw_(2) = info->yawdotdot_traj_.evaluateDeBoorT(t_r)[0];
-      }
+      // } else {
+      //   // Replan from non-static state, starting from 'replan_time' seconds later
+      //   LocalTrajData* info = &planner_manager_->local_data_;
+      //   double t_r = (ros::Time::now() - info->start_time_).toSec() + fame_params_->replan_time_;
+      //   fame_data_->start_pt_ = info->position_traj_.evaluateDeBoorT(t_r);
+      //   fame_data_->start_vel_ = info->velocity_traj_.evaluateDeBoorT(t_r);
+      //   fame_data_->start_acc_ = info->acceleration_traj_.evaluateDeBoorT(t_r);
+      //   fame_data_->start_yaw_(0) = info->yaw_traj_.evaluateDeBoorT(t_r)[0];
+      //   fame_data_->start_yaw_(1) = info->yawdot_traj_.evaluateDeBoorT(t_r)[0];
+      //   fame_data_->start_yaw_(2) = info->yawdotdot_traj_.evaluateDeBoorT(t_r)[0];
+      // }
       // Inform traj_server the replanning
       replan_pub_.publish(std_msgs::Empty());
       int res = callExplorationPlanner();
@@ -250,22 +248,6 @@ void FameExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       break;
     }
 
-    case PUB_TRAJ: {
-      double dt = (ros::Time::now() - fame_data_->newest_traj_.start_time).toSec();
-      if (dt > 0) {
-        bspline_pub_.publish(fame_data_->newest_traj_);
-        fame_data_->static_state_ = false;
-
-        // fame_data_->newest_traj_.drone_id = planner_manager_->swarm_traj_data_.drone_id_;
-        fame_data_->newest_traj_.drone_id = expl_manager_->ep_->drone_id_;
-        swarm_traj_pub_.publish(fame_data_->newest_traj_);
-
-        thread vis_thread(&FameExplorationFSM::visualize, this, 2);
-        vis_thread.detach();
-        transitState(EXEC_TRAJ, "FSM");
-      }
-      break;
-    }
 
     case EXEC_TRAJ: {
       fame_data_->static_state_ = false;
@@ -343,54 +325,16 @@ int FameExplorationFSM::callExplorationPlanner() {
   ros::Time time_r = ros::Time::now() + ros::Duration(fame_params_->replan_time_);
 
   int res;
-  if (fame_data_->avoid_collision_ || fame_data_->go_back_) {  // Only replan trajectory
-    res = expl_manager_->planTrajToView(fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_,
-        fame_data_->start_yaw_, expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
-    fame_data_->avoid_collision_ = false;
-    ROS_WARN("res at planTrajToView %d",res);
-  } else {  // Do full planning normally
+  // if (fame_data_->avoid_collision_ || fame_data_->go_back_) {  // Only replan trajectory
+  //   res = expl_manager_->planTrajToView(fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_,
+  //       fame_data_->start_yaw_, expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
+  //   fame_data_->avoid_collision_ = false;
+  //   ROS_WARN("res at planTrajToView %d",res);
+  // } else {  // Do full planning normally
     res = expl_manager_->planExploreMotion(
         fame_data_->start_pt_, fame_data_->start_vel_, fame_data_->start_acc_, fame_data_->start_yaw_);
       ROS_WARN("res at planExploreMotion %d",res);
-  }
-  // ROS_WARN("res at 350 %d",res);
-  // if (res == SUCCEED) {
-  //   auto info = &planner_manager_->local_data_;
-  //   info->start_time_ = (ros::Time::now() - time_r).toSec() > 0 ? ros::Time::now() : time_r;
-
-  //   bspline::Bspline bspline;
-  //   bspline.order = planner_manager_->pp_.bspline_degree_;
-  //   bspline.start_time = info->start_time_;
-  //   bspline.traj_id = info->traj_id_;
-  //   Eigen::MatrixXd pos_pts = info->position_traj_.getControlPoint();
-    
-
-
-  //   for (int i = 0; i < pos_pts.rows(); ++i) {
-  //     geometry_msgs::Point pt;
-  //     mrs_msgs::Reference pose;
-  //     pose.position.x = pos_pts(i, 0);
-  //     pose.position.y = pos_pts(i, 1);
-  //     pose.position.z = pos_pts(i, 2);
-  //     pose.heading    = 0;
-  //     pt.x = pos_pts(i, 0);
-  //     pt.y = pos_pts(i, 1);
-  //     pt.z = pos_pts(i, 2);
-  //     bspline.pos_pts.push_back(pt);
-  //   }
-  //   Eigen::VectorXd knots = info->position_traj_.getKnot();
-  //   for (int i = 0; i < knots.rows(); ++i) {
-  //     bspline.knots.push_back(knots(i));
-  //   }
-  //   Eigen::MatrixXd yaw_pts = info->yaw_traj_.getControlPoint();
-  //   for (int i = 0; i < yaw_pts.rows(); ++i) {
-  //     double yaw = yaw_pts(i, 0);
-  //     bspline.yaw_pts.push_back(yaw);
-  //   }
-  //   bspline.yaw_dt = info->yaw_traj_.getKnotSpan();
-  //   fame_data_->newest_traj_ = bspline;
   // }
-  // ROS_WARN("res at 387 %d",res);
   return res;
 }
 
@@ -516,10 +460,10 @@ void FameExplorationFSM::visualize(int content) {
     tour.stamp = ros::Time::now().toSec();
     grid_tour_pub_.publish(tour);
 
-    visualization_->drawBspline(info->position_traj_, 0.1,
-        PlanningVisualization::getColor(
-            (expl_manager_->ep_->drone_id_ - 1) / double(expl_manager_->ep_->drone_num_)),
-        false, 0.15, Vector4d(1, 1, 0, 1));
+    // visualization_->drawBspline(info->position_traj_, 0.1,
+    //     PlanningVisualization::getColor(
+    //         (expl_manager_->ep_->drone_id_ - 1) / double(expl_manager_->ep_->drone_num_)),
+    //     false, 0.15, Vector4d(1, 1, 0, 1));
   }
 }
 
@@ -607,13 +551,13 @@ void FameExplorationFSM::heartbitCallback(const ros::TimerEvent& e) {
 void FameExplorationFSM::safetyCallback(const ros::TimerEvent& e) {
   if (state_ == EXPL_STATE::EXEC_TRAJ) {
     // Check safety and trigger replan if necessary
-    double dist;
-    bool safe = planner_manager_->checkTrajCollision(dist);
-    if (!safe) {
-      // ROS_WARN("Replan: collision detected==================================");
-      fame_data_->avoid_collision_ = true;
-      transitState(PLAN_TRAJ, "safetyCallback");
-    }
+    // double dist;
+    // bool safe = planner_manager_->checkTrajCollision(dist);
+    // if (!safe) {
+    //   // ROS_WARN("Replan: collision detected==================================");
+    //   fame_data_->avoid_collision_ = true;
+    //   transitState(PLAN_TRAJ, "safetyCallback");
+    // }
 
     static auto time_check = ros::Time::now();
     if (expl_manager_->sdf_map_->getOccupancy(fame_data_->odom_pos_) != SDFMap::OCCUPANCY::FREE) {
@@ -668,17 +612,17 @@ void FameExplorationFSM::droneStateTimerCallback(const ros::TimerEvent& e) {
 
   auto& state = expl_manager_->ed_->swarm_state_[msg.drone_id - 1];
 
-  if (fame_data_->static_state_) {
+  // if (fame_data_->static_state_) {
     state.pos_ = fame_data_->odom_pos_;
     state.vel_ = fame_data_->odom_vel_;
     state.yaw_ = fame_data_->odom_yaw_;
-  } else {
-    LocalTrajData* info = &planner_manager_->local_data_;
-    double t_r = (ros::Time::now() - info->start_time_).toSec();
-    state.pos_ = info->position_traj_.evaluateDeBoorT(t_r);
-    state.vel_ = info->velocity_traj_.evaluateDeBoorT(t_r);
-    state.yaw_ = info->yaw_traj_.evaluateDeBoorT(t_r)[0];
-  }
+  // } else {
+  //   LocalTrajData* info = &planner_manager_->local_data_;
+  //   double t_r = (ros::Time::now() - info->start_time_).toSec();
+  //   state.pos_ = info->position_traj_.evaluateDeBoorT(t_r);
+  //   state.vel_ = info->velocity_traj_.evaluateDeBoorT(t_r);
+  //   state.yaw_ = info->yaw_traj_.evaluateDeBoorT(t_r)[0];
+  // }
   state.stamp_ = ros::Time::now().toSec();
   msg.pos = { float(state.pos_[0]), float(state.pos_[1]), float(state.pos_[2]) };
   msg.vel = { float(state.vel_[0]), float(state.vel_[1]), float(state.vel_[2]) };
@@ -902,76 +846,76 @@ void FameExplorationFSM::optResMsgCallback(
   }
 }
 
-void FameExplorationFSM::swarmTrajCallback(const bspline::BsplineConstPtr& msg) {
-  // Get newest trajs from other drones, for inter-drone collision avoidance
-  auto& sdat = planner_manager_->swarm_traj_data_;
+// void FameExplorationFSM::swarmTrajCallback(const bspline::BsplineConstPtr& msg) {
+//   // Get newest trajs from other drones, for inter-drone collision avoidance
+//   auto& sdat = planner_manager_->swarm_traj_data_;
 
-  // Ignore self trajectory
-  if (msg->drone_id == sdat.drone_id_) return;
+//   // Ignore self trajectory
+//   if (msg->drone_id == sdat.drone_id_) return;
 
-  // Ignore outdated trajectory
-  if (sdat.receive_flags_[msg->drone_id - 1] == true &&
-      msg->start_time.toSec() <= sdat.swarm_trajs_[msg->drone_id - 1].start_time_ + 1e-3)
-    return;
+//   // Ignore outdated trajectory
+//   if (sdat.receive_flags_[msg->drone_id - 1] == true &&
+//       msg->start_time.toSec() <= sdat.swarm_trajs_[msg->drone_id - 1].start_time_ + 1e-3)
+//     return;
 
-  // Convert the msg to B-spline
-  Eigen::MatrixXd pos_pts(msg->pos_pts.size(), 3);
-  Eigen::VectorXd knots(msg->knots.size());
-  for (int i = 0; i < msg->knots.size(); ++i) knots(i) = msg->knots[i];
+//   // Convert the msg to B-spline
+//   Eigen::MatrixXd pos_pts(msg->pos_pts.size(), 3);
+//   Eigen::VectorXd knots(msg->knots.size());
+//   for (int i = 0; i < msg->knots.size(); ++i) knots(i) = msg->knots[i];
 
-  for (int i = 0; i < msg->pos_pts.size(); ++i) {
-    pos_pts(i, 0) = msg->pos_pts[i].x;
-    pos_pts(i, 1) = msg->pos_pts[i].y;
-    pos_pts(i, 2) = msg->pos_pts[i].z;
-  }
+//   for (int i = 0; i < msg->pos_pts.size(); ++i) {
+//     pos_pts(i, 0) = msg->pos_pts[i].x;
+//     pos_pts(i, 1) = msg->pos_pts[i].y;
+//     pos_pts(i, 2) = msg->pos_pts[i].z;
+//   }
 
 
-  sdat.swarm_trajs_[msg->drone_id - 1].setUniformBspline(pos_pts, msg->order, 0.1);
-  sdat.swarm_trajs_[msg->drone_id - 1].setKnot(knots);
-  sdat.swarm_trajs_[msg->drone_id - 1].start_time_ = msg->start_time.toSec();
-  sdat.receive_flags_[msg->drone_id - 1] = true;
+//   sdat.swarm_trajs_[msg->drone_id - 1].setUniformBspline(pos_pts, msg->order, 0.1);
+//   sdat.swarm_trajs_[msg->drone_id - 1].setKnot(knots);
+//   sdat.swarm_trajs_[msg->drone_id - 1].start_time_ = msg->start_time.toSec();
+//   sdat.receive_flags_[msg->drone_id - 1] = true;
 
-  if (state_ == EXEC_TRAJ) {
-    // Check collision with received trajectory
-    if (!planner_manager_->checkSwarmCollision(msg->drone_id)) {
-      ROS_ERROR("Drone %d collide with drone %d.", sdat.drone_id_, msg->drone_id);
-      fame_data_->avoid_collision_ = true;
-      transitState(PLAN_TRAJ, "swarmTrajCallback");
-    }
-  }
-}
+//   if (state_ == EXEC_TRAJ) {
+//     // Check collision with received trajectory
+//     if (!planner_manager_->checkSwarmCollision(msg->drone_id)) {
+//       ROS_ERROR("Drone %d collide with drone %d.", sdat.drone_id_, msg->drone_id);
+//       fame_data_->avoid_collision_ = true;
+//       transitState(PLAN_TRAJ, "swarmTrajCallback");
+//     }
+//   }
+// }
 
-void FameExplorationFSM::swarmTrajTimerCallback(const ros::TimerEvent& e) {
-  // Broadcast newest traj of this drone to others
-  if (state_ == EXEC_TRAJ) {
-    swarm_traj_pub_.publish(fame_data_->newest_traj_);
+// void FameExplorationFSM::swarmTrajTimerCallback(const ros::TimerEvent& e) {
+//   // Broadcast newest traj of this drone to others
+//   if (state_ == EXEC_TRAJ) {
+//     swarm_traj_pub_.publish(fame_data_->newest_traj_);
 
-  } else if (state_ == INIT) {
-    // Publish a virtual traj at current pose, to avoid collision
-    bspline::Bspline bspline;
-    bspline.order = planner_manager_->pp_.bspline_degree_;
-    bspline.start_time = ros::Time::now();
-    bspline.traj_id = planner_manager_->local_data_.traj_id_;
+//   } else if (state_ == INIT) {
+//     // Publish a virtual traj at current pose, to avoid collision
+//     bspline::Bspline bspline;
+//     bspline.order = planner_manager_->pp_.bspline_degree_;
+//     bspline.start_time = ros::Time::now();
+//     bspline.traj_id = planner_manager_->local_data_.traj_id_;
 
-    Eigen::MatrixXd pos_pts(4, 3);
-    for (int i = 0; i < 4; ++i) pos_pts.row(i) = fame_data_->odom_pos_.transpose();
+//     Eigen::MatrixXd pos_pts(4, 3);
+//     for (int i = 0; i < 4; ++i) pos_pts.row(i) = fame_data_->odom_pos_.transpose();
 
-    for (int i = 0; i < pos_pts.rows(); ++i) {
-      geometry_msgs::Point pt;
-      pt.x = pos_pts(i, 0);
-      pt.y = pos_pts(i, 1);
-      pt.z = pos_pts(i, 2);
-      bspline.pos_pts.push_back(pt);
-    }
+//     for (int i = 0; i < pos_pts.rows(); ++i) {
+//       geometry_msgs::Point pt;
+//       pt.x = pos_pts(i, 0);
+//       pt.y = pos_pts(i, 1);
+//       pt.z = pos_pts(i, 2);
+//       bspline.pos_pts.push_back(pt);
+//     }
 
-    NonUniformBspline tmp(pos_pts, planner_manager_->pp_.bspline_degree_, 1.0);
-    Eigen::VectorXd knots = tmp.getKnot();
-    for (int i = 0; i < knots.rows(); ++i) {
-      bspline.knots.push_back(knots(i));
-    }
-    bspline.drone_id = expl_manager_->ep_->drone_id_;
-    swarm_traj_pub_.publish(bspline);
-  }
-}
+//     NonUniformBspline tmp(pos_pts, planner_manager_->pp_.bspline_degree_, 1.0);
+//     Eigen::VectorXd knots = tmp.getKnot();
+//     for (int i = 0; i < knots.rows(); ++i) {
+//       bspline.knots.push_back(knots(i));
+//     }
+//     bspline.drone_id = expl_manager_->ep_->drone_id_;
+//     swarm_traj_pub_.publish(bspline);
+//   }
+// }
 
 }  // namespace fast_planner

@@ -218,9 +218,9 @@ int FameExplorationManager::planExploreMotion(
     return FAIL;
   }
 
-  if (planTrajToView(pos, vel, acc, yaw, next_pos, next_yaw) == FAIL) {
-    return FAIL;
-  }
+  // if (planTrajToView(pos, vel, acc, yaw, next_pos, next_yaw) == FAIL) {
+  //   return FAIL;
+  // }
 
   double total = (ros::Time::now() - t2).toSec();
   ROS_INFO("Total time: %lf", total);
@@ -488,9 +488,9 @@ bool FameExplorationManager::explorerPlan(const Vector3d& pos, const Vector3d& v
     centroid /= ftr.second.size();
 
     // Check that the position is valid
-    if (!isPositionReachable(pos, centroid)) {
-      continue;
-    }
+    // if (!isPositionReachable(pos, centroid)) {
+    //   continue;
+    // }
 
     // Total cost
     double total_cost = totalCost(centroid, ftr.first);
@@ -765,10 +765,10 @@ bool FameExplorationManager::greedyPlan(const Vector3d& pos, const Vector3d& vel
     LABEL vp_label = vp_pos[i].first;
 
     // Check that the position is valid
-    if (!isPositionReachable(pos, vp_position)) {
-      ROS_WARN(" is position reachable: %d\n", isPositionReachable(pos, vp_position));
-      continue;
-    }
+    // if (!isPositionReachable(pos, vp_position)) {
+    //   ROS_WARN(" is position reachable: %d\n", isPositionReachable(pos, vp_position));
+    //   continue;
+    // }
 
     // Calculate path from current position to viewpoint
     double path_length;
