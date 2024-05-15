@@ -32,6 +32,7 @@
   <arg name="fy"/>
   <arg name="max_vel"/>
   <arg name="max_acc"/>
+  <arg name="max_jerk"/>
   <arg name="simulation" default="true"/>
   <arg name="single_expo" default="false"/>
 
@@ -245,7 +246,7 @@
     <param name="collab_assigner/active" value="$(arg active_collaboration)" type="bool"/>
     
     <!-- Explorer parameters -->
-    <param name="explorer/ftr_max_distance" value="10.0" type="double"/>
+    <param name="explorer/ftr_max_distance" value="15.0" type="double"/>
     <param name="explorer/max_ang_dist" value="$(eval 360 * 3.1415926 / 180.0)" type="double"/>
     <param name="explorer/label_penalty" value="0.0" type="double"/>
     <param name="explorer/w_distance" value="0.0" type="double"/>
