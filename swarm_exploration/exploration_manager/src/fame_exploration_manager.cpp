@@ -772,10 +772,10 @@ bool FameExplorationManager::greedyPlan(const Vector3d& pos, const Vector3d& vel
 
     // Calculate path from current position to viewpoint
     double path_length;
-    if (!ViewNode::validPathExists(pos, vp_position, path_length)) {
-      ROS_WARN(" is path existing: %d\n", ViewNode::validPathExists(pos, vp_position, path_length));
-      continue;
-    }
+    // if (!ViewNode::validPathExists(pos, vp_position, path_length)) {
+    //   ROS_WARN(" is path existing: %d\n", ViewNode::validPathExists(pos, vp_position, path_length));
+    //   continue;
+    // }
     ROS_WARN("The value of path_length is: %f\n", path_length);
     double time_to_dest = collector_params_->w_distance * path_length / ViewNode::vm_;
 

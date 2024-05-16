@@ -82,8 +82,13 @@
     <arg name="fy" value="$(arg fy)"/>
 
     <!-- maximum velocity and acceleration the drone will reach -->
+    <!-- <arg name="max_vel" value="1.0" />
+    <arg name="max_acc" value="1.0" />
+    <arg name="max_jerk" value="20.0" /> -->
+
     <arg name="max_vel" value="4.0" />
     <arg name="max_acc" value="2.0" />
+    <arg name="max_jerk" value="40.0" />
     <!-- <arg name="max_vel" value="1.0" />
     <arg name="max_acc" value="0.8" /> -->
     <arg name="simulation" value="$(arg simulation)" />
